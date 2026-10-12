@@ -372,9 +372,9 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
     """
     args = dict(args)  # Don't mutate original
 
-    # For list_column, check for aliases like y, col, field
-    if name == "list_column" and "column" not in args:
-        for k in ("y", "col", "field", "name", "target", "column_name", "key"):
+    # For list_column and sum_column, check for aliases like col, field, etc.
+    if name in ("list_column", "sum_column") and "column" not in args:
+        for k in ("col", "field", "name", "target", "column_name", "key", "y"):
             if k in args and isinstance(args[k], str) and args[k]:
                 args["column"] = args[k]
                 break
@@ -1209,10 +1209,20 @@ class ModelAgent(Agent):
                 " IMPORTANT: You MUST use the provided tools to compute ALL numeric results. "
                 "Do NOT compute values in your head — you will make errors. "
                 "Step 1: Call read_fixture for every fixture name listed in the task. "
-                "Step 2: Use sum_column to compute single-table totals with optional filters (e.g. table=invoices, column=invoices.amount, filter='status != \"void\"' to compute billed_total). Do not call sum_column on child tables when parent status matters; use join_and_aggregate instead. "
-                "Step 3: To compute paid_total and aggregate payments for non-void invoices, call join_and_aggregate: table=invoices, right_table=payments, join=invoice_id, dedup=payment_id, filter='status != \"void\"', columns=['amount'], group=invoice_id. Its total gives paid_total. "
-                "Step 4: Use calculate to compute outstanding_total (billed_total - paid_total, e.g. 2600 - 1500). Its result gives outstanding_total. The calculator accepts ONLY numeric literals and +, -, *, /. Never pass field names, variables, or sum() to the calculator. "
-                "Step 5: Compare invoices_amount with amount for each non-void invoice. An invoice is unpaid when invoices_amount > amount (e.g. 800 > 300 or 600 > 0). Fully paid invoices have invoices_amount == amount (e.g. 1200 == 1200). Ignore void invoices. Return the IDs of unpaid invoices sorted in unpaid_invoice_ids. "
+            )
+            if "invoices" in task.inputs:
+                system += (
+                    "Step 2: Use sum_column to compute single-table totals with optional filters (e.g. table=invoices, column=invoices.amount, filter='status != \"void\"' to compute billed_total). Do not call sum_column on child tables when parent status matters; use join_and_aggregate instead. "
+                    "Step 3: To compute paid_total and aggregate payments for non-void invoices, call join_and_aggregate: table=invoices, right_table=payments, join=invoice_id, dedup=payment_id, filter='status != \"void\"', columns=['amount'], group=invoice_id. Its total gives paid_total. "
+                    "Step 4: Use calculate to compute outstanding_total (billed_total - paid_total, e.g. 2600 - 1500). Its result gives outstanding_total. The calculator accepts ONLY numeric literals and +, -, *, /. Never pass field names, variables, or sum() to the calculator. "
+                    "Step 5: Compare invoices_amount with amount for each non-void invoice. An invoice is unpaid when invoices_amount > amount (e.g. 800 > 300 or 600 > 0). Fully paid invoices have invoices_amount == amount (e.g. 1200 == 1200). Ignore void invoices. Return the IDs of unpaid invoices sorted in unpaid_invoice_ids. "
+                )
+            else:
+                system += (
+                    "Step 2: Use sum_column to compute single-table column totals (table, column) with optional filters if requested. "
+                    "Step 3: Use calculate to compute arithmetic expressions between numbers if needed. "
+                )
+            system += (
                 "Use table.column for all column names, e.g. invoices.status or payments.amount. "
                 "Never fabricate tool results or repeat an identical failed call. "
                 "JSON list fields must be arrays, not strings. "
@@ -1773,12 +1783,16 @@ class ModelAgent(Agent):
                                 + " You are an independent verifier. Review and verify the draft. "
                                 "Check every required field in the draft against your tool execution results. "
                                 "Update any draft field whose value differs from the tool results. "
-                                "To verify multi-table relationships (e.g. payments against non-void invoices), "
-                                "use join_and_aggregate to combine, deduplicate by unique payment ID, and group by ID to see paid amounts per entity. "
-                                "The join_and_aggregate total gives paid_total, and the calculated difference gives outstanding_total. "
-                                "Compare against parent entity amounts to identify unpaid items. "
-                                "Do NOT use sum_column on a child table alone when parent table status matters. "
-                                "All fixture records are already loaded in memory; do not call read_fixture. "
+                                + (
+                                    "To verify multi-table relationships (e.g. payments against non-void invoices), "
+                                    "use join_and_aggregate to combine, deduplicate by unique payment ID, and group by ID to see paid amounts per entity. "
+                                    "The join_and_aggregate total gives paid_total, and the calculated difference gives outstanding_total. "
+                                    "Compare against parent entity amounts to identify unpaid items. "
+                                    "Do NOT use sum_column on a child table alone when parent table status matters. "
+                                    if "invoices" in task.inputs
+                                    else "Re-check calculations and totals using the available tools. "
+                                )
+                                + "All fixture records are already loaded in memory; do not call read_fixture. "
                                 "Return exactly one final JSON object matching the output schema."
                             ),
                         },
@@ -1806,9 +1820,13 @@ class ModelAgent(Agent):
                                         "FINAL ANSWER REQUIRED. No further tool calls are available. "
                                         "Do not output a tool name, function parameters, or a tool call. "
                                         "Update the draft using your verified tool execution results above: "
-                                        "set billed_total from sum_column, set paid_total to the total from join_and_aggregate, "
-                                        "and set outstanding_total to the difference from calculate. "
-                                        "Return exactly one final JSON object matching this schema: "
+                                        + (
+                                            "set billed_total from sum_column, set paid_total to the total from join_and_aggregate, "
+                                            "and set outstanding_total to the difference from calculate. "
+                                            if "invoices" in task.inputs
+                                            else "replace any incorrect draft values with your tool results. "
+                                        )
+                                        + "Return exactly one final JSON object matching this schema: "
                                         + json.dumps(task.output_schema)
                                     ),
                                 }
