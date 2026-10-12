@@ -1,0 +1,48 @@
+.venv/
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+.arena/
+*.db
+*.db-shm
+*.db-wal
+frontend/playwright-report/
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+arena-run.json
+*.zip
+.env.*
+!.env.example
+.arena-env-*
+*.pem
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python environment and caches
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+*.py[cod]
+.coverage
+coverage.xml
+
+# Frontend dependencies and generated builds
+node_modules/
+**/node_modules/
+dist/
+build/
+.next/
+
+# Local operating-system and log files
+.DS_Store
+*.log

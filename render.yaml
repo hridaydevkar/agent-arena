@@ -1,0 +1,14 @@
+# Optional public RESULTS site, not public agent execution. No API keys needed or allowed.
+services:
+  - type: web
+    name: agent-arena-results
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: ARENA_READ_ONLY
+        value: '1'
+      - key: ARENA_DATA_DIR
+        value: /tmp/arena-public
+      - key: ARENA_PUBLIC_SNAPSHOT
+        value: /app/public-data/results.json

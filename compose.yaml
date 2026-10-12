@@ -1,0 +1,36 @@
+services:
+  arena:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      ARENA_DATA_DIR: /data
+      ARENA_READ_ONLY: ${ARENA_READ_ONLY:-0}
+      ARENA_CALL_INTERVAL_SECONDS: ${ARENA_CALL_INTERVAL_SECONDS:-0}
+      ARENA_PUBLIC_SNAPSHOT: /app/public-data/results.json
+      ARENA_WORKERS: ${ARENA_WORKERS:-2}
+      ARENA_API_TOKEN: ${ARENA_API_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      ARENA_INPUT_PRICE: ${ARENA_INPUT_PRICE:-}
+      ARENA_OUTPUT_PRICE: ${ARENA_OUTPUT_PRICE:-}
+    volumes:
+      - arena-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 1g
+    cpus: 2.0
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+volumes:
+  arena-data:

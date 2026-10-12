@@ -1,0 +1,841 @@
+[
+  {
+    "id": "invoice-reconciliation",
+    "title": "Reconcile a messy invoice ledger",
+    "category": "Data analysis",
+    "difficulty": "Medium",
+    "description": "Read invoices and payments. Ignore void invoices. Exclude duplicate payments with the same payment_id. Return billed_total, paid_total (payments against non-void invoices only), outstanding_total and unpaid_invoice_ids (positive balance, sorted).",
+    "operation": "invoices",
+    "inputs": {
+      "invoices": [
+        {
+          "id": "INV-101",
+          "amount": 1200,
+          "status": "open"
+        },
+        {
+          "id": "INV-102",
+          "amount": 800,
+          "status": "open"
+        },
+        {
+          "id": "INV-103",
+          "amount": 500,
+          "status": "void"
+        },
+        {
+          "id": "INV-104",
+          "amount": 600,
+          "status": "open"
+        }
+      ],
+      "payments": [
+        {
+          "payment_id": "P1",
+          "invoice_id": "INV-101",
+          "amount": 1200
+        },
+        {
+          "payment_id": "P2",
+          "invoice_id": "INV-102",
+          "amount": 300
+        },
+        {
+          "payment_id": "P2",
+          "invoice_id": "INV-102",
+          "amount": 300
+        },
+        {
+          "payment_id": "P3",
+          "invoice_id": "INV-103",
+          "amount": 500
+        }
+      ]
+    },
+    "expected": {
+      "billed_total": 2600,
+      "paid_total": 1500,
+      "outstanding_total": 1100,
+      "unpaid_invoice_ids": [
+        "INV-102",
+        "INV-104"
+      ]
+    },
+    "output_schema": {
+      "billed_total": "int",
+      "paid_total": "int",
+      "outstanding_total": "int",
+      "unpaid_invoice_ids": "list"
+    },
+    "tags": [
+      "Deduplication",
+      "Reconciliation"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "revenue-by-region",
+    "title": "Find the highest-revenue region",
+    "category": "Data analysis",
+    "difficulty": "Easy",
+    "description": "Read orders. Exclude cancelled orders. Net revenue is amount minus refund. Return total_net_revenue, top_region, and top_region_revenue. Break ties alphabetically.",
+    "operation": "revenue",
+    "inputs": {
+      "orders": [
+        {
+          "region": "APAC",
+          "amount": 1200,
+          "refund": 100,
+          "status": "paid"
+        },
+        {
+          "region": "EMEA",
+          "amount": 900,
+          "refund": 0,
+          "status": "paid"
+        },
+        {
+          "region": "APAC",
+          "amount": 500,
+          "refund": 0,
+          "status": "cancelled"
+        },
+        {
+          "region": "AMER",
+          "amount": 1600,
+          "refund": 200,
+          "status": "paid"
+        },
+        {
+          "region": "APAC",
+          "amount": 600,
+          "refund": 0,
+          "status": "paid"
+        }
+      ]
+    },
+    "expected": {
+      "total_net_revenue": 4000,
+      "top_region": "APAC",
+      "top_region_revenue": 1700
+    },
+    "output_schema": {
+      "total_net_revenue": "int",
+      "top_region": "str",
+      "top_region_revenue": "int"
+    },
+    "tags": [
+      "Aggregation",
+      "Data cleaning"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "latency-audit",
+    "title": "Investigate a latency regression",
+    "category": "Data analysis",
+    "difficulty": "Medium",
+    "description": "Read requests. Exclude failed requests. Return successful_requests, mean_latency_ms rounded to 2 decimals, p95_latency_ms using nearest-rank percentile (ceil(0.95*n)), and slow_request_ids (latency strictly above 500 ms, sorted).",
+    "operation": "latency",
+    "inputs": {
+      "requests": [
+        {
+          "id": "R1",
+          "latency_ms": 100,
+          "status": "ok"
+        },
+        {
+          "id": "R2",
+          "latency_ms": 120,
+          "status": "ok"
+        },
+        {
+          "id": "R3",
+          "latency_ms": 150,
+          "status": "ok"
+        },
+        {
+          "id": "R4",
+          "latency_ms": 200,
+          "status": "ok"
+        },
+        {
+          "id": "R5",
+          "latency_ms": 250,
+          "status": "ok"
+        },
+        {
+          "id": "R6",
+          "latency_ms": 300,
+          "status": "ok"
+        },
+        {
+          "id": "R7",
+          "latency_ms": 550,
+          "status": "ok"
+        },
+        {
+          "id": "R8",
+          "latency_ms": 900,
+          "status": "ok"
+        },
+        {
+          "id": "R9",
+          "latency_ms": 9000,
+          "status": "failed"
+        },
+        {
+          "id": "R10",
+          "latency_ms": 400,
+          "status": "ok"
+        }
+      ]
+    },
+    "expected": {
+      "successful_requests": 9,
+      "mean_latency_ms": 330,
+      "p95_latency_ms": 900,
+      "slow_request_ids": [
+        "R7",
+        "R8"
+      ]
+    },
+    "output_schema": {
+      "successful_requests": "int",
+      "mean_latency_ms": "int",
+      "p95_latency_ms": "int",
+      "slow_request_ids": "list"
+    },
+    "tags": [
+      "Statistics",
+      "Observability"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "subscription-metrics",
+    "title": "Calculate monthly recurring revenue",
+    "category": "Data analysis",
+    "difficulty": "Hard",
+    "description": "Read subscriptions. Only active subscriptions count. Annual prices must be divided by 12. Return active_customers, mrr, arr, and enterprise_mrr. Each row is one customer; round currency to 2 decimals.",
+    "operation": "subscriptions",
+    "inputs": {
+      "subscriptions": [
+        {
+          "id": "A",
+          "status": "active",
+          "plan": "enterprise",
+          "period": "annual",
+          "price": 12000
+        },
+        {
+          "id": "B",
+          "status": "active",
+          "plan": "starter",
+          "period": "monthly",
+          "price": 49
+        },
+        {
+          "id": "C",
+          "status": "cancelled",
+          "plan": "enterprise",
+          "period": "monthly",
+          "price": 900
+        },
+        {
+          "id": "D",
+          "status": "active",
+          "plan": "enterprise",
+          "period": "monthly",
+          "price": 500
+        },
+        {
+          "id": "E",
+          "status": "trial",
+          "plan": "starter",
+          "period": "monthly",
+          "price": 49
+        }
+      ]
+    },
+    "expected": {
+      "active_customers": 3,
+      "mrr": 1549,
+      "arr": 18588,
+      "enterprise_mrr": 1500
+    },
+    "output_schema": {
+      "active_customers": "int",
+      "mrr": "int",
+      "arr": "int",
+      "enterprise_mrr": "int"
+    },
+    "tags": [
+      "Finance",
+      "Normalization"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "vendor-comparison",
+    "title": "Choose a compliant cloud vendor",
+    "category": "Research",
+    "difficulty": "Medium",
+    "description": "Read vendor briefs and policy. Eligible vendors must have eu_hosting=true, soc2=true, and price <= budget. Choose lowest price, breaking ties by name. Return selected_vendor, monthly_cost, eligible_vendors (alphabetical), and citation_ids (selected vendor's source_id only). These are synthetic vendor briefs, not live market claims.",
+    "operation": "vendors",
+    "inputs": {
+      "policy": {
+        "budget": 200
+      },
+      "vendors": [
+        {
+          "name": "Aster",
+          "price": 150,
+          "eu_hosting": true,
+          "soc2": true,
+          "source_id": "brief-01"
+        },
+        {
+          "name": "Birch",
+          "price": 90,
+          "eu_hosting": false,
+          "soc2": true,
+          "source_id": "brief-02"
+        },
+        {
+          "name": "Cedar",
+          "price": 180,
+          "eu_hosting": true,
+          "soc2": true,
+          "source_id": "brief-03"
+        },
+        {
+          "name": "Dune",
+          "price": 120,
+          "eu_hosting": true,
+          "soc2": false,
+          "source_id": "brief-04"
+        }
+      ]
+    },
+    "expected": {
+      "selected_vendor": "Aster",
+      "monthly_cost": 150,
+      "eligible_vendors": [
+        "Aster",
+        "Cedar"
+      ],
+      "citation_ids": [
+        "brief-01"
+      ]
+    },
+    "output_schema": {
+      "selected_vendor": "str",
+      "monthly_cost": "int",
+      "eligible_vendors": "list",
+      "citation_ids": "list"
+    },
+    "tags": [
+      "Source grounding",
+      "Constraints"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "conflicting-sources",
+    "title": "Resolve a conflicting product claim",
+    "category": "Research",
+    "difficulty": "Hard",
+    "description": "Read sources. Use only official sources, selecting the latest by ISO date for each topic. Return storage_gb, retention_days, and citation_ids of the selected sources sorted alphabetically. Community sources are not authoritative.",
+    "operation": "sources",
+    "inputs": {
+      "sources": [
+        {
+          "id": "src-01",
+          "topic": "storage_gb",
+          "value": 50,
+          "official": true,
+          "date": "2025-01-01"
+        },
+        {
+          "id": "src-02",
+          "topic": "storage_gb",
+          "value": 100,
+          "official": true,
+          "date": "2025-06-01"
+        },
+        {
+          "id": "src-03",
+          "topic": "retention_days",
+          "value": 30,
+          "official": true,
+          "date": "2025-02-01"
+        },
+        {
+          "id": "src-04",
+          "topic": "retention_days",
+          "value": 90,
+          "official": false,
+          "date": "2025-07-01"
+        }
+      ]
+    },
+    "expected": {
+      "storage_gb": 100,
+      "retention_days": 30,
+      "citation_ids": [
+        "src-02",
+        "src-03"
+      ]
+    },
+    "output_schema": {
+      "storage_gb": "int",
+      "retention_days": "int",
+      "citation_ids": "list"
+    },
+    "tags": [
+      "Recency",
+      "Citations"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "evidence-review",
+    "title": "Separate evidence from speculation",
+    "category": "Research",
+    "difficulty": "Medium",
+    "description": "Read studies. Include only randomized studies with sample_size >= 100. Return qualifying_ids sorted, total_participants, and weighted_effect (sum(effect*sample_size)/total_participants, rounded to 2 decimals). All studies are synthetic fixtures.",
+    "operation": "studies",
+    "inputs": {
+      "studies": [
+        {
+          "id": "S1",
+          "design": "randomized",
+          "sample_size": 200,
+          "effect": 0.2
+        },
+        {
+          "id": "S2",
+          "design": "observational",
+          "sample_size": 1000,
+          "effect": 0.9
+        },
+        {
+          "id": "S3",
+          "design": "randomized",
+          "sample_size": 50,
+          "effect": 0.8
+        },
+        {
+          "id": "S4",
+          "design": "randomized",
+          "sample_size": 300,
+          "effect": 0.1
+        }
+      ]
+    },
+    "expected": {
+      "qualifying_ids": [
+        "S1",
+        "S4"
+      ],
+      "total_participants": 500,
+      "weighted_effect": 0.14
+    },
+    "output_schema": {
+      "qualifying_ids": "list",
+      "total_participants": "int",
+      "weighted_effect": "float"
+    },
+    "tags": [
+      "Evidence quality",
+      "Synthesis"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "policy-audit",
+    "title": "Audit an access-control policy",
+    "category": "Research",
+    "difficulty": "Easy",
+    "description": "Read policy and access_requests. Approve only if the user's role is allowed for that resource AND mfa=true. Return approved_ids and denied_ids, both sorted, and citation_ids containing the policy source_id.",
+    "operation": "access",
+    "inputs": {
+      "policy": {
+        "source_id": "policy-v3",
+        "roles": {
+          "billing": [
+            "admin",
+            "finance"
+          ],
+          "deploy": [
+            "admin",
+            "engineer"
+          ]
+        }
+      },
+      "access_requests": [
+        {
+          "id": "A1",
+          "resource": "billing",
+          "role": "finance",
+          "mfa": true
+        },
+        {
+          "id": "A2",
+          "resource": "deploy",
+          "role": "engineer",
+          "mfa": false
+        },
+        {
+          "id": "A3",
+          "resource": "billing",
+          "role": "engineer",
+          "mfa": true
+        },
+        {
+          "id": "A4",
+          "resource": "deploy",
+          "role": "admin",
+          "mfa": true
+        }
+      ]
+    },
+    "expected": {
+      "approved_ids": [
+        "A1",
+        "A4"
+      ],
+      "denied_ids": [
+        "A2",
+        "A3"
+      ],
+      "citation_ids": [
+        "policy-v3"
+      ]
+    },
+    "output_schema": {
+      "approved_ids": "list",
+      "denied_ids": "list",
+      "citation_ids": "list"
+    },
+    "tags": [
+      "Policy retrieval",
+      "Verification"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "ticket-triage",
+    "title": "Prioritize the support queue",
+    "category": "Operations",
+    "difficulty": "Medium",
+    "description": "Read tickets. Exclude resolved tickets. Sort remaining tickets by severity (critical, high, medium, low), then created_at ascending, then id. Return ordered_ids, critical_count, and next_ticket_id.",
+    "operation": "tickets",
+    "inputs": {
+      "tickets": [
+        {
+          "id": "T1",
+          "severity": "high",
+          "created_at": "2025-06-01T09:00",
+          "status": "open"
+        },
+        {
+          "id": "T2",
+          "severity": "critical",
+          "created_at": "2025-06-01T10:00",
+          "status": "open"
+        },
+        {
+          "id": "T3",
+          "severity": "critical",
+          "created_at": "2025-06-01T08:00",
+          "status": "resolved"
+        },
+        {
+          "id": "T4",
+          "severity": "low",
+          "created_at": "2025-05-30T09:00",
+          "status": "open"
+        },
+        {
+          "id": "T5",
+          "severity": "high",
+          "created_at": "2025-06-01T08:00",
+          "status": "open"
+        }
+      ]
+    },
+    "expected": {
+      "ordered_ids": [
+        "T2",
+        "T5",
+        "T1",
+        "T4"
+      ],
+      "critical_count": 1,
+      "next_ticket_id": "T2"
+    },
+    "output_schema": {
+      "ordered_ids": "list",
+      "critical_count": "int",
+      "next_ticket_id": "str"
+    },
+    "tags": [
+      "Prioritization",
+      "Tool use"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "shipping-planner",
+    "title": "Find the cheapest eligible shipment",
+    "category": "Operations",
+    "difficulty": "Easy",
+    "description": "Read shipment and carriers. A carrier qualifies when max_weight_kg >= weight_kg and days <= deadline_days. Cost is base_cost + per_kg * weight_kg. Return carrier, total_cost, and delivery_days. Break cost ties alphabetically by carrier name.",
+    "operation": "shipping",
+    "inputs": {
+      "shipment": {
+        "weight_kg": 8,
+        "deadline_days": 3
+      },
+      "carriers": [
+        {
+          "name": "Arrow",
+          "base_cost": 10,
+          "per_kg": 2,
+          "days": 2,
+          "max_weight_kg": 10
+        },
+        {
+          "name": "Budget",
+          "base_cost": 2,
+          "per_kg": 1,
+          "days": 7,
+          "max_weight_kg": 50
+        },
+        {
+          "name": "Cargo",
+          "base_cost": 8,
+          "per_kg": 1.5,
+          "days": 3,
+          "max_weight_kg": 30
+        },
+        {
+          "name": "Dash",
+          "base_cost": 5,
+          "per_kg": 1,
+          "days": 1,
+          "max_weight_kg": 5
+        }
+      ]
+    },
+    "expected": {
+      "carrier": "Cargo",
+      "total_cost": 20,
+      "delivery_days": 3
+    },
+    "output_schema": {
+      "carrier": "str",
+      "total_cost": "int",
+      "delivery_days": "int"
+    },
+    "tags": [
+      "Optimization",
+      "Constraints"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "inventory-restock",
+    "title": "Plan an inventory replenishment",
+    "category": "Operations",
+    "difficulty": "Hard",
+    "description": "Read inventory. Available = on_hand + incoming - reserved. When available < reorder_point, order target_stock - available units. Return order_quantities keyed by SKU (only SKUs needing orders), total_units, and estimated_cost using unit_cost.",
+    "operation": "inventory",
+    "inputs": {
+      "inventory": [
+        {
+          "sku": "K1",
+          "on_hand": 10,
+          "incoming": 5,
+          "reserved": 8,
+          "reorder_point": 10,
+          "target_stock": 30,
+          "unit_cost": 4
+        },
+        {
+          "sku": "K2",
+          "on_hand": 30,
+          "incoming": 0,
+          "reserved": 5,
+          "reorder_point": 10,
+          "target_stock": 40,
+          "unit_cost": 8
+        },
+        {
+          "sku": "K3",
+          "on_hand": 3,
+          "incoming": 0,
+          "reserved": 2,
+          "reorder_point": 5,
+          "target_stock": 20,
+          "unit_cost": 2
+        }
+      ]
+    },
+    "expected": {
+      "order_quantities": {
+        "K1": 23,
+        "K3": 19
+      },
+      "total_units": 42,
+      "estimated_cost": 130
+    },
+    "output_schema": {
+      "order_quantities": "dict",
+      "total_units": "int",
+      "estimated_cost": "int"
+    },
+    "tags": [
+      "Planning",
+      "Inventory"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  },
+  {
+    "id": "schedule-builder",
+    "title": "Build a dependency-aware schedule",
+    "category": "Operations",
+    "difficulty": "Hard",
+    "description": "Read jobs. Unlimited parallel workers are available. Jobs start after all dependencies finish; jobs with no dependencies start at hour 0. Return completion_hours (job id to finish hour), makespan_hours, and critical_path. The critical path ends at the last finishing job; choose alphabetically for ties.",
+    "operation": "schedule",
+    "inputs": {
+      "jobs": [
+        {
+          "id": "A",
+          "duration": 2,
+          "depends_on": []
+        },
+        {
+          "id": "B",
+          "duration": 3,
+          "depends_on": [
+            "A"
+          ]
+        },
+        {
+          "id": "C",
+          "duration": 6,
+          "depends_on": [
+            "A"
+          ]
+        },
+        {
+          "id": "D",
+          "duration": 2,
+          "depends_on": [
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "completion_hours": {
+        "A": 2,
+        "B": 5,
+        "C": 8,
+        "D": 10
+      },
+      "makespan_hours": 10,
+      "critical_path": [
+        "A",
+        "C",
+        "D"
+      ]
+    },
+    "output_schema": {
+      "completion_hours": "dict",
+      "makespan_hours": "int",
+      "critical_path": "list"
+    },
+    "tags": [
+      "Dependencies",
+      "Scheduling"
+    ],
+    "version": "1.0.0",
+    "suite": "workbench-v1",
+    "tools": [
+      "fixtures.read",
+      "calculator.evaluate"
+    ],
+    "rubric": "Equal weight for each required output field. Numeric tolerance: 0.01; lists must follow the specified order. All fields must pass for task success."
+  }
+]
