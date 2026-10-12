@@ -413,13 +413,14 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
             table = next(iter(fixture_data))
             args["table"] = table
 
-    # Auto-qualify column names
-    if "column" in args and table:
-        args["column"] = _qualify_column(args["column"], table)
-    if "filter_column" in args and table:
-        filter_table = table
-        if "." not in args.get("filter_column", ""):
-            args["filter_column"] = _qualify_column(args["filter_column"], filter_table)
+    # Auto-qualify column names for single-table tools
+    if name != "join_and_aggregate":
+        if "column" in args and table:
+            args["column"] = _qualify_column(args["column"], table)
+        if "filter_column" in args and table:
+            filter_table = table
+            if "." not in args.get("filter_column", ""):
+                args["filter_column"] = _qualify_column(args["filter_column"], filter_table)
 
     # Dedup aliases
     if "dedup" in args and "dedup_column" not in args:
@@ -474,6 +475,19 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
             join_hint = str(join_hint[0])
         join_hint = str(join_hint).strip("[]'\" ")
 
+        # Parse compound join conditions like "orders.id = order_items.order_id"
+        if join_hint and not (args.get("left_on") and args.get("right_on")):
+            for sep in ("=", "=="):
+                if sep in join_hint:
+                    p1, p2 = [p.strip() for p in join_hint.split(sep, 1)]
+                    for p in (p1, p2):
+                        p_short = p.rsplit(".", 1)[-1]
+                        if p_short in lt_cols or (lt and p.startswith(lt + ".")):
+                            args["left_on"] = f"{lt}.{p_short}"
+                        if p_short in rt_cols or (rt and p.startswith(rt + ".")):
+                            args["right_on"] = f"{rt}.{p_short}"
+                    break
+
         if not args.get("left_on"):
             if join_hint and join_hint in lt_cols:
                 args["left_on"] = f"{lt}.{join_hint}"
@@ -522,19 +536,36 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
         elif lt and "." not in args["group_column"]:
             args["group_column"] = f"{lt}.{args['group_column']}"
 
+        if not args.get("agg_op"):
+            for op_key in ("agg_op", "op", "operation"):
+                if args.get(op_key) in ("sum", "count", "avg", "min", "max"):
+                    args["agg_op"] = args[op_key]
+                    break
+
         if not args.get("agg_column"):
-            col_arg = args.get("columns") or args.get("column") or args.get("agg")
+            col_arg = args.get("columns") or args.get("column") or args.get("col") or args.get("field") or args.get("target")
+            if not col_arg and args.get("agg") not in ("sum", "count", "avg", "min", "max"):
+                col_arg = args.get("agg")
             if col_arg:
                 if isinstance(col_arg, list) and col_arg:
                     col_arg = str(col_arg[0])
                 col_str = str(col_arg).strip("[]'\" ")
+                if "," in col_str:
+                    candidates = [c.strip("[]'\" ") for c in col_str.split(",")]
+                    col_str = candidates[0]
+                    for c in candidates:
+                        c_short = c.rsplit(".", 1)[-1]
+                        if rt and c_short in rt_cols and not c_short.endswith("_id") and c_short != "id":
+                            col_str = c
+                            break
                 if col_str:
-                    if "." in col_str:
+                    col_short = col_str.rsplit(".", 1)[-1] if "." in col_str else col_str
+                    if rt and col_short in rt_cols:
+                        args["agg_column"] = f"{rt}.{col_short}"
+                    elif lt and col_short in lt_cols:
+                        args["agg_column"] = f"{lt}.{col_short}"
+                    elif "." in col_str:
                         args["agg_column"] = col_str
-                    elif rt and col_str in rt_cols:
-                        args["agg_column"] = f"{rt}.{col_str}"
-                    elif lt and col_str in lt_cols:
-                        args["agg_column"] = f"{lt}.{col_str}"
                     else:
                         args["agg_column"] = col_str
         elif rt and "." not in args["agg_column"]:
@@ -572,13 +603,19 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
 
         if "filter_column" in args:
             fc = args["filter_column"]
-            if fc and "." not in fc:
-                if lt and fc in lt_cols:
-                    args["filter_column"] = f"{lt}.{fc}"
-                elif rt and fc in rt_cols:
-                    args["filter_column"] = f"{rt}.{fc}"
-                elif lt:
-                    args["filter_column"] = f"{lt}.{fc}"
+            if fc:
+                fc_short = fc.rsplit(".", 1)[-1] if "." in fc else fc
+                if lt_cols and fc_short in lt_cols and fc_short not in rt_cols:
+                    args["filter_column"] = f"{lt}.{fc_short}"
+                elif rt_cols and fc_short in rt_cols and fc_short not in lt_cols:
+                    args["filter_column"] = f"{rt}.{fc_short}"
+                elif "." not in fc:
+                    if lt and fc in lt_cols:
+                        args["filter_column"] = f"{lt}.{fc}"
+                    elif rt and fc in rt_cols:
+                        args["filter_column"] = f"{rt}.{fc}"
+                    elif lt:
+                        args["filter_column"] = f"{lt}.{fc}"
 
     # Extract structured filter from free-text 'filter' or 'condition' params
     for freetext_key in ("filter", "condition", "where"):
@@ -599,6 +636,13 @@ def _normalize_tool_args(name: str, args: dict, fixture_data: dict = None) -> di
                     or curr_fc_short in (args.get("join"), args.get("group"))
                 ):
                     args.update(parsed)
+                    if name == "join_and_aggregate":
+                        fc = args.get("filter_column", "")
+                        fc_short = fc.rsplit(".", 1)[-1] if "." in fc else fc
+                        if rt_cols and fc_short in rt_cols and fc_short not in lt_cols:
+                            args["filter_column"] = f"{rt}.{fc_short}"
+                        elif lt_cols and fc_short in lt_cols and fc_short not in rt_cols:
+                            args["filter_column"] = f"{lt}.{fc_short}"
                     break
 
     # Auto-correct column mismatch if filter_value exists in a different column of the table
@@ -830,6 +874,32 @@ def _dispatch_flat_tool(name: str, args: dict, fixture_data: dict, tools_ctx, ta
 
     else:
         raise ValueError(f"Unknown data tool: {name}")
+
+
+def _normalize_fixture_name(args: dict, task_inputs: dict) -> str:
+    """Extract and normalize fixture name from tool call arguments."""
+    if not isinstance(args, dict):
+        return str(args or "")
+    name = (
+        args.get("name")
+        or args.get("fixture")
+        or args.get("fixture_name")
+        or args.get("file")
+        or args.get("filename")
+        or args.get("f")
+        or args.get("path")
+        or args.get("table")
+        or args.get("key")
+    )
+    if not name and len(args) == 1:
+        name = next(iter(args.values()))
+    if isinstance(name, str):
+        name = name.removesuffix(".json").strip()
+        for inp in task_inputs:
+            if inp.lower() == name.lower():
+                return inp
+        return name
+    return str(name or "")
 
 
 def _extract_content_tool_calls(content: str, available_tools: list[str]) -> list[dict]:
@@ -1145,8 +1215,9 @@ class ModelAgent(Agent):
                         "agg_op: sum, count, or omit for raw joined rows. "
                         "filter_column/filter_op/filter_value: optional filter applied before aggregation. "
                         "group_column: optional column to group by before aggregation. "
-                        "Example: table=invoices, right_table=payments, join=invoice_id, "
-                        "dedup=payment_id, filter='status != \"void\"', columns=['amount'], group=invoice_id"
+                        "Examples: "
+                        "table=orders, right_table=order_items, join=order_id, filter='status == \"completed\"', columns=['line_total']; "
+                        "table=invoices, right_table=payments, join=invoice_id, dedup=payment_id, filter='status != \"void\"', columns=['amount'], group=invoice_id"
                     ),
                     "parameters": {
                         "type": "object",
@@ -1210,7 +1281,7 @@ class ModelAgent(Agent):
                 "Do NOT compute values in your head — you will make errors. "
                 "Step 1: Call read_fixture for every fixture name listed in the task. "
             )
-            if "invoices" in task.inputs:
+            if task.operation == "invoices":
                 system += (
                     "Step 2: Use sum_column to compute single-table totals with optional filters (e.g. table=invoices, column=invoices.amount, filter='status != \"void\"' to compute billed_total). Do not call sum_column on child tables when parent status matters; use join_and_aggregate instead. "
                     "Step 3: To compute paid_total and aggregate payments for non-void invoices, call join_and_aggregate: table=invoices, right_table=payments, join=invoice_id, dedup=payment_id, filter='status != \"void\"', columns=['amount'], group=invoice_id. Its total gives paid_total. "
@@ -1219,11 +1290,17 @@ class ModelAgent(Agent):
                 )
             else:
                 system += (
-                    "Step 2: Use sum_column to compute single-table column totals (table, column) with optional filters if requested. "
-                    "Step 3: Use calculate to compute arithmetic expressions between numbers if needed. "
+                    "Step 2: For single-table totals or sums, use sum_column (table, column) with optional filters if requested. "
+                    "Do not call sum_column on child tables alone when parent filtering or relationships are required; use join_and_aggregate instead. "
+                    "Step 3: For multi-table operations or joins across related tables, use join_and_aggregate: "
+                    "specify table, right_table, join column (via join, left_on, right_on), filter (e.g. status != 'void' or status == 'completed'), "
+                    "and columns to aggregate. Only deduplicate (dedup) or group (group) if explicitly requested by the task instructions. "
+                    "Step 4: Use calculate to compute arithmetic expressions between numbers (e.g. differences, net amounts) if needed. "
+                    "The calculator accepts ONLY numeric literals and +, -, *, /. Never pass field names, variables, or words to calculate. "
+                    "Step 5: For identifying list fields (such as IDs meeting specific conditions), inspect the tool results and return matching values sorted as required. "
                 )
             system += (
-                "Use table.column for all column names, e.g. invoices.status or payments.amount. "
+                "Use table.column format for all column names. "
                 "Never fabricate tool results or repeat an identical failed call. "
                 "JSON list fields must be arrays, not strings. "
                 "JSON numeric fields must contain numbers, not strings. "
@@ -1253,7 +1330,7 @@ class ModelAgent(Agent):
             if any(not math.isfinite(float(p)) or float(p) < 0 for p in (prices[0], prices[1])):
                 raise ValueError("Token prices must be finite, nonnegative numbers")
 
-        with httpx.Client(timeout=httpx.Timeout(90, connect=15)) as client:
+        with httpx.Client(timeout=httpx.Timeout(90, connect=30)) as client:
 
             def completion(history, phase, enable_tools):
                 nonlocal call_count
@@ -1292,9 +1369,9 @@ class ModelAgent(Agent):
                             and body["messages"][0].get("role") == "system"
                         ):
                             body["messages"][0]["content"] += (
-                                " IMPORTANT FOR THIS TURN: only read_fixture is "
-                                "available. Call read_fixture for each fixture name "
-                                "that has not yet been read. Do not attempt to use "
+                                f" IMPORTANT FOR THIS TURN: only read_fixture is "
+                                f"available. Call read_fixture(name=...) for each unread fixture: "
+                                f"{', '.join(sorted(missing_fixtures))}. Do not attempt to use "
                                 "other tools yet. Do not write simulated "
                                 "tool calls in ordinary text."
                             )
@@ -1542,7 +1619,7 @@ class ModelAgent(Agent):
                         }
 
                         if enable_tools and not tool_calls:
-                            avail = [t["function"]["name"] for t in body.get("tools", [])]
+                            avail = [t["function"]["name"] for t in functions]
                             sim_calls = _extract_content_tool_calls(content, avail)
                             if sim_calls:
                                 tool_calls = sim_calls
@@ -1599,7 +1676,7 @@ class ModelAgent(Agent):
                     if raw["message"].get("tool_calls"):
                         raw["message"]["content"] = None
                     elif enable_tools:
-                        avail = [t["function"]["name"] for t in body.get("tools", [])]
+                        avail = [t["function"]["name"] for t in functions]
                         sim_calls = _extract_content_tool_calls(raw["message"].get("content", ""), avail)
                         if sim_calls:
                             raw["message"]["tool_calls"] = sim_calls
@@ -1738,7 +1815,7 @@ class ModelAgent(Agent):
                                 )
                             try:
                                 if name == "read_fixture":
-                                    fixture_name = args["name"]
+                                    fixture_name = _normalize_fixture_name(args, task.inputs)
                                     value = tools.read_file(fixture_name)
                                     read_fixtures.add(fixture_name)
                                     fixture_data[fixture_name] = value
@@ -1789,8 +1866,12 @@ class ModelAgent(Agent):
                                     "The join_and_aggregate total gives paid_total, and the calculated difference gives outstanding_total. "
                                     "Compare against parent entity amounts to identify unpaid items. "
                                     "Do NOT use sum_column on a child table alone when parent table status matters. "
-                                    if "invoices" in task.inputs
-                                    else "Re-check calculations and totals using the available tools. "
+                                    if task.operation == "invoices"
+                                    else (
+                                        "To verify multi-table relationships or child totals dependent on parent status, "
+                                        "use join_and_aggregate to combine tables, apply filters, and aggregate. "
+                                        "Use sum_column for single-table checks and calculate for arithmetic differences. "
+                                    )
                                 )
                                 + "All fixture records are already loaded in memory; do not call read_fixture. "
                                 "Return exactly one final JSON object matching the output schema."
@@ -1823,7 +1904,7 @@ class ModelAgent(Agent):
                                         + (
                                             "set billed_total from sum_column, set paid_total to the total from join_and_aggregate, "
                                             "and set outstanding_total to the difference from calculate. "
-                                            if "invoices" in task.inputs
+                                            if task.operation == "invoices"
                                             else "replace any incorrect draft values with your tool results. "
                                         )
                                         + "Return exactly one final JSON object matching this schema: "
@@ -1880,7 +1961,7 @@ class ModelAgent(Agent):
 
                                 try:
                                     if name == "read_fixture":
-                                        fixture_name = args["name"]
+                                        fixture_name = _normalize_fixture_name(args, task.inputs)
                                         value = tools.read_file(fixture_name)
                                         read_fixtures.add(fixture_name)
                                         fixture_data[fixture_name] = value
