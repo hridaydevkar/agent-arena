@@ -116,14 +116,18 @@ Update the README's actual repository/release/demo links after they exist. Do no
 
 ### Option A: GitHub Pages (Recommended — 100% Free, No Credit Card Required)
 
-A GitHub Actions workflow is provided at `.github/workflows/deploy-pages.yml` to build and publish a static, read-only showcase of AgentArena directly on GitHub Pages. It requires zero billing setup, no credit card, and no backend server maintenance:
+The static showcase is compiled locally and published directly to the `gh-pages` branch. It uses GitHub's native static file hosting ("Deploy from a branch") and requires **zero billing setup, no credit card, no GitHub Actions runner minutes, and no backend server maintenance**:
 
-1. **Enable GitHub Pages via Actions:**
+1. **Deploy to `gh-pages` branch:**
+   ```bash
+   cd frontend
+   npm run deploy
+   ```
+   This automatically builds the static demo bundle (`VITE_STATIC_DEMO=true`), includes the `404.html` SPA fallback and `.nojekyll`, and pushes directly to the `gh-pages` branch on your GitHub repository.
+2. **Enable GitHub Pages:**
    - In your GitHub repository, go to **Settings** → **Pages**.
-   - Under **Build and deployment** → **Source**, select **GitHub Actions**.
-2. **Deploy:**
-   - Push to `main` or trigger the workflow manually from **Actions** → **Deploy Static Demo to GitHub Pages** → **Run workflow**.
-   - The workflow installs frontend dependencies, compiles the static demo bundle (`VITE_STATIC_DEMO=true npm run build`), configures 404 fallbacks for SPA client-side routing, and deploys the artifact to GitHub Pages.
+   - Under **Build and deployment** → **Source**, select **Deploy from a branch**.
+   - Under **Branch**, select **`gh-pages`** and folder **`/ (root)`**, then click **Save**.
 3. **Verify:**
    - Open your GitHub Pages URL (`https://<username>.github.io/<repo-name>/`).
    - Confirm all views load: Overview, Leaderboard, Tasks, Runs, Replay, and Experiments.

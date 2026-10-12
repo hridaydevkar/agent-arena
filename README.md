@@ -242,11 +242,16 @@ Full prompt & tool traces                     Sanitized benchmark runs & referen
 ```
 
 ### 1. Free, Cardless Public Demo (GitHub Pages — Recommended)
-A dedicated GitHub Actions workflow is provided in `.github/workflows/deploy-pages.yml` that builds and deploys the read-only static showcase to GitHub Pages completely free without requiring credit card or payment details:
+The static showcase is published to the `gh-pages` branch and served directly via GitHub Pages without consuming GitHub Actions minutes:
 1. In your GitHub repository, navigate to **Settings** → **Pages**.
-2. Under **Build and deployment** → **Source**, select **GitHub Actions**.
-3. Push to `main` (or run the workflow manually via **Actions** → **Deploy Static Demo to GitHub Pages** → **Run workflow**).
+2. Under **Build and deployment** → **Source**, select **Deploy from a branch**.
+3. Under **Branch**, select **`gh-pages`** and folder **`/ (root)`**, then click **Save**.
 4. Your static showcase will be live at `https://<username>.github.io/<repo-name>/`.
+
+To redeploy or update the demo at any time:
+```bash
+cd frontend && npm run deploy
+```
 
 ### 2. Export a Public Report for Local / Docker Gallery
 After completing an experiment in your local workbench, export the sanitized summary:

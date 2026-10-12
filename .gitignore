@@ -42,6 +42,8 @@ node_modules/
 dist/
 build/
 .next/
+.vite/
+**/.vite/
 
 # Local operating-system and log files
 .DS_Store
