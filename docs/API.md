@@ -91,7 +91,7 @@ Errors have a `detail` string or an array of validation details. Validation resp
 
 Returns 202 and a queued job, `experiment_id`, and `max_model_requests` (13 at default budgets for one task). Creates Direct, Tool user, Verifier identities on the same model. A provider must be configured; task IDs must be distinct/current; routers `openrouter/free` and `openrouter/auto` are rejected. Experiment call budgets are 3–8 and output caps 256–4096. Direct uses one request; Verifier's review consumes one of its own total calls. These are not dollar limits. The job may complete with failed individual runs.
 
-`POST /api/agents` accepts model fields `model_id`, `architecture` (`direct`, `tools`, `verify`), `max_calls` (default 6, range 2–8; Verifier requires at least 3), and `max_output_tokens` (default 1800, range 256–4096). Model overrides never borrow the configured model's manual price estimate.
+`POST /api/agents` accepts model fields `model_id`, `architecture` (`direct`, `tools`, `verify`), `max_calls` (default 6, range 2–8; Verifier requires at least 4), and `max_output_tokens` (default 1800, range 256–4096). Model overrides never borrow the configured model's manual price estimate.
 
 `GET /api/runs?job_id=...` filters run summaries to a selected job. Full runs additionally record architecture, model_calls, cost_source, resolved_models, provider and budgets; older run records may lack these fields.
 

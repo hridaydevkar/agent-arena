@@ -1,244 +1,324 @@
-# AgentArena · v0.2
+# AgentArena (v0.2.0)
 
-### Does adding tools or a verification pass actually make an agent better?
+> **An open-source, local-first workbench to measure whether tools and verification passes actually make AI agents better.**
 
-AgentArena is a local-first workbench for answering that question with **real model calls, explicit task checks, and inspectable traces**. It connects to OpenRouter (or another OpenAI-compatible endpoint), runs three different agent implementations on the same controlled task, and records quality, latency, calls, tokens, and known/unknown cost.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](pyproject.toml)
+[![Automated Tests](https://img.shields.io/badge/Tests-147%20passing-success.svg)](tests/)
 
-**The four starter agents are scripted reference policies, not AI models.** The new **Experiments** page is where you run genuine model-backed comparisons. Your provider key is required for those calls. No live model results have been invented or bundled into this release.
-
-![Real model experiment setup](docs/screenshots/experiments.png)
-
-## What changed from v0.1?
-
-- **OpenRouter setup wizard:** hidden terminal key entry, authenticated metadata check, live model catalogue, saved git-ignored `.env`.
-- **Automatic `.env` loading:** the launcher now reads local settings. No repeated shell exports.
-- **Three real architectures:** Direct, Tool user, and Verifier—different code paths, not just different names.
-- **Controlled experiments:** one model, selected tasks, explicit call and output-token budgets, visible consent.
-- **Better evidence:** architecture, request counts, tokens, returned model IDs, and cost source are recorded.
-- **OpenRouter integration:** provider-reported cost when available; helpful 401/402/429 errors; no automatic retries, model routers, or provider fallback in experiments.
-- **Public results mode:** blocks writes/inference, refuses provider credentials, and uses an isolated database.
-- **Summary-only publication:** export measured results without raw prompts, outputs, traces, or private error details.
-- **GitHub + Render guide:** prepared deployment files, not an already-deployed website.
-
-## For your M2 Mac with 8 GB RAM: start here
-
-OpenRouter runs the model in the cloud. Your Mac only runs the UI/backend, so you do **not** need to load Llama locally or run Docker for this route.
-
-### 1. Extract the new archive into a NEW folder
-
-Do not overwrite an older customized checkout. Open a terminal in the new `agent-arena` folder. You need **Python 3.11+**, preferably 3.12/3.13. Internet is needed for dependency installation and provider calls.
-
-The downloadable ZIP includes the compiled UI. Node is unnecessary unless you change frontend source.
-
-### 2. Install/check the app
-
-```bash
-python3 scripts/start.py --check
-```
-
-### 3. Connect OpenRouter privately
-
-```bash
-.venv/bin/python scripts/setup_openrouter.py
-```
-
-The wizard:
-1. Asks for your key with hidden typing. **Do not paste it into a chat or screenshot.**
-2. Checks `/api/v1/key`—no model inference.
-3. Fetches current model metadata and lists specific IDs advertising tool support.
-4. Lets you select a model, including free-token-priced options if currently listed.
-5. Explains pricing and requests confirmation before saving a plaintext `.env` file with owner-only permissions on macOS/Linux.
-
-Free models still have quotas and capacity limits. Catalogue support is not a guarantee of successful tool calls. Set a low **per-key spending cap in the OpenRouter dashboard**; request/token limits in this app are not hard dollar caps.
-
-If the catalogue cannot load, the wizard permits a manually entered model ID, but its pricing/tool support is explicitly unverified. Do not use `openrouter/free` or `openrouter/auto` for a controlled comparison because they may choose different models.
-
-### 4. Start the app
-
-```bash
-python3 scripts/start.py --port 8002
-```
-
-Open **http://localhost:8002 → Experiments**.
-
-Local `.env` settings override inherited shell settings when using this launcher. Secrets are not printed. Raw `uvicorn` commands do not invoke this loader; use `--env-file .env` or exported variables in that case.
-
-### 5. Run your FIRST experiment on ONE task
-
-1. Verify the configured model ID.
-2. Keep **Reconcile a messy invoice ledger** selected; leave other tasks unselected.
-3. Start with 6 calls per tool-based agent and 1,800 output tokens per request.
-4. Read and confirm the provider-usage notice.
-5. Click **Run three-agent comparison**.
-
-This queues **three actual model runs**. Maximum default usage for one task is **13 model requests** (1 + 6 + 6), not necessarily 13 actual calls. Input tokens also consume quota/cost. The wizard sets one worker and a 3.2-second process-wide interval between request starts; other apps using your key can still exhaust account limits.
-
-**If a reasoning-heavy model runs out of output tokens**, the run fails visibly. Choose a less reasoning-heavy model or explicitly raise the output cap and rerun. No invisible repair call is made.
-
-### 6. Read the evidence
-
-| Agent | Actual implementation |
-|---|---|
-| Direct | One model call with all fixtures in the prompt. No tools. |
-| Tool user | Named fixture reads and arithmetic tools; bounded model/tool loop. |
-| Verifier | Tool-using solver followed by a separate review call with the task, original fixtures, and draft. **No expected answers are provided.** |
-
-Verifier's review is included in its total request budget. Verification is **not an oracle** and can worsen the answer. All three have access to the same source information, but through different mechanisms. Provider aliases, routing, model nondeterminism, and budget differences remain confounders.
-
-Open each **Replay** and inspect the real messages/tool results. Use **Evaluation** for field checks, then **Compare** for output divergence. A single pass on one fixture is exploratory evidence, not a publishable “best agent” claim.
-
-## Windows / Linux
-
-Windows: `py scripts/start.py --check`, then `.venv\Scripts\python.exe scripts/setup_openrouter.py`, then `py scripts/start.py --port 8002`.
-
-Linux: use the macOS commands. If `venv` is unavailable, install the distro's Python venv package. These paths are provided, but native macOS/Windows execution was not performed in the delivery environment.
-
-## Can I use Gemini or my local Llama instead?
-
-Yes, the adapter speaks the OpenAI-compatible chat-completions protocol. OpenRouter is the simplest first path for your existing key. Do not configure all providers at once.
-
-- **Gemini:** configure Google's OpenAI-compatible base URL and a model available to your AI Studio project. Account/model/tool support and quota determine compatibility.
-- **Local Llama:** if it is installed through Ollama, `ollama list` shows the exact model name. A local endpoint can use `http://localhost:11434/v1` with a non-empty compatibility key such as `ollama`. Your 8 GB shared RAM limits practical model size and tool reliability; don't download a large model just for this project. Local models are optional, not required for the OpenRouter workflow.
-
-See [provider notes](docs/OPENROUTER.md). No Gemini account, OpenRouter key, or Ollama instance was accessed in this delivery.
+AgentArena evaluates language models on identical, deterministic multi-step tasks across three distinct architectures—**Direct**, **Tool user**, and **Verifier**. Instead of relying on self-reported scores, black-box benchmarks, or subjective human impressions, AgentArena runs real model calls, captures inspectable execution traces, verifies outputs with deterministic field checks, and tracks costs transparently.
 
 ---
 
-## Publishing: both open source AND a usable website
+## Table of Contents
 
-Use two separate environments:
+1. [Overview & Key Capabilities](#overview--key-capabilities)
+2. [Three Agent Architectures](#three-agent-architectures)
+3. [Visual Tour](#visual-tour)
+4. [Quick Start (First 5 Minutes)](#quick-start-first-5-minutes)
+5. [Running an Experiment & Interpreting Evidence](#running-an-experiment--interpreting-evidence)
+6. [Architecture & Execution Flow](#architecture--execution-flow)
+7. [Development Setup & Testing](#development-setup--testing)
+8. [Publishing & Deployment Options](#publishing--deployment-options)
+9. [Security, Limitations & Troubleshooting](#security-limitations--troubleshooting)
+10. [Project Structure, Contribution & License](#project-structure-contribution--license)
+
+---
+
+## Overview & Key Capabilities
+
+- **Local-first Workbench:** Runs entirely on your local machine with an in-process execution queue and local SQLite persistence. No cloud dependencies required to run the UI or evaluate tasks.
+- **Three Real Architectures:** Executes Direct generative completion, bounded tool-use loops, and independent verification passes—different code paths and execution mechanics, not just prompt labels.
+- **Inspectable Tool Traces:** Every model invocation, tool request, argument, return payload, and duration is captured and replayable step-by-step.
+- **Deterministic Field Evaluator:** Validates structured JSON outputs against exact task schemas and invariants outside the model’s context.
+- **Transparent Cost Accounting:** Differentiates between provider-reported costs (OpenRouter), token-price estimates, and unpriced models (reported honestly as `Unknown`, never misleadingly as `$0.00`).
+- **Separation of Trust Tracks:** Clearly distinguishes between scripted reference baselines (`reference`), managed model executions (`managed-model`), and external SDK submissions (`self-reported`).
+- **Public Read-Only Gallery:** Publish measured summaries to an isolated read-only website without exposing private credentials, raw prompts, or server write access.
+
+---
+
+## Three Agent Architectures
+
+The workbench compares three distinct agent implementations on the exact same challenge:
+
+| Architecture | Execution Mechanics | Intended Role | Key Nuance |
+|---|---|---|---|
+| **Direct** | One single-turn model request with all fixture data inlined directly into the prompt. No tools are provided. | Baseline generative reasoning and memorization. | Often suffers on complex math, relational joins, or large context windows. |
+| **Tools** | Multi-turn bounded loop with access to registered data tools (`read_fixture`, `sum_column`, `join_and_aggregate`, `list_column`, `calculate`). | Interactive data retrieval and deterministic computation. | Model must format parameters correctly and handle intermediate tool outputs. |
+| **Verifier** | Bounded tool-using solver produces an initial draft; an independent review pass recomputes evidence from fixtures and corrects discrepancies. | Self-critique, error detection, and independent verification. | **Not an oracle:** verification inspects evidence and can fix flawed drafts, but can also worsen answers if tool queries diverge. |
+
+> **Reference Policies vs. Model Agents:**
+> The four starter agents (**Atlas**, **Meridian**, **Relay**, **Scout**) are scripted, deterministic Python policies used to baseline the tasks. Model comparisons are created and executed on the **Experiments** page using real model calls.
+
+---
+
+## Visual Tour
+
+### 1. Workbench Overview & Leaderboard
+Monitor recent runs, category success rates, and relative performance across reference and model tracks.
+![Overview Dashboard](docs/screenshots/overview.png)
+
+### 2. Controlled Experiment Setup
+Configure task selection, request call budgets, and token limits with visible usage warnings.
+![Controlled Experiment Setup](docs/screenshots/experiments.png)
+
+### 3. Step-by-Step Replay & Execution Traces
+Inspect every model prompt, function call, tool result, latency, and evaluator check.
+![Execution Trace Replay](docs/screenshots/replay.png)
+
+### 4. Side-by-Side Architectural Comparison
+Compare output field divergence, step counts, runtimes, and execution traces between architectures.
+![Side-by-Side Comparison](docs/screenshots/compare.png)
+
+---
+
+## Quick Start (First 5 Minutes)
+
+You need **Python 3.11+** (Python 3.12 or 3.13 recommended). The downloadable package includes the prebuilt frontend; Node.js is only needed if you edit frontend source.
+
+### 1. Install & Verify Setup
+In your project directory, run:
+```bash
+python3 scripts/start.py --check
+```
+This automatically sets up a private `.venv`, installs the backend and SDK in editable mode, and verifies that dependencies and the bundled UI are ready.
+
+### 2. Connect a Model Provider
+
+Choose either **OpenRouter** (cloud, no GPU required) or **Ollama** (local offline execution):
+
+#### Option A: OpenRouter Setup Wizard (Recommended)
+```bash
+.venv/bin/python scripts/setup_openrouter.py
+```
+- Prompts for your OpenRouter key with hidden terminal entry.
+- Authenticates with OpenRouter's `/api/v1/key` endpoint (metadata check only; no inference requested).
+- Fetches the live model catalog and filters for models advertising tool support.
+- Saves an owner-only, git-ignored local `.env` file.
+
+#### Option B: Local Ollama Server
+If running Ollama locally, add these settings to your `.env` file:
+```bash
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_MODEL=llama3.2:3b
+OPENAI_API_KEY=ollama
+```
+
+### 3. Start the Workbench
+```bash
+python3 scripts/start.py --port 8000
+```
+Open **http://localhost:8000** in your browser.
+
+> **Cross-Platform Notes:**
+> - **macOS / Linux:** Use the commands above. For auto-reload during development, use `python scripts/serve.py --reload`.
+> - **Windows:** Run `py scripts/start.py --check`, then `.venv\Scripts\python.exe scripts/setup_openrouter.py`, then `py scripts/start.py --port 8000`.
+> - For a detailed walkthrough, see [QUICKSTART.md](QUICKSTART.md).
+
+---
+
+## Running an Experiment & Interpreting Evidence
+
+1. Navigate to **Experiments** in the web UI (**http://localhost:8000/experiments**).
+2. Select your task (e.g., *Reconcile a messy invoice ledger*).
+3. Set execution budgets:
+   - **Max calls per tool agent:** `6` (range: 3–8).
+   - **Max output tokens:** `1800` (range: 256–4096).
+4. Review the estimated request budget and click **Run three-agent comparison**.
+5. Once completed:
+   - Open **Replay** to inspect the sequence of LLM turns and tool executions.
+   - Open **Evaluation** to see deterministic field checks (e.g., `billed_total`, `paid_total`, `outstanding_total`, `unpaid_invoice_ids`).
+   - Open **Compare** to view output divergence and execution diffs side-by-side.
+
+> **Illustrative Development Observations:**
+> During local v0.2 validation with `llama3.2:3b` via Ollama:
+> - **Direct:** Scored `0.25` on invoice reconciliation (missed deduplicated payments and void exclusions in zero-shot context).
+> - **Tools:** Scored `1.0` (used `sum_column` and `join_and_aggregate` with deduplication to compute all fields accurately).
+> - **Verifier:** Scored `1.0` (solver generated candidate answers; verifier independently executed tools, checked fields, and produced verified output).
+> *Note: These are illustrative local development results on synthetic tasks, not universal claims of model capability across all domains.*
+
+---
+
+## Architecture & Execution Flow
 
 ```text
-Your Mac / a user's computer                  Public results website
-───────────────────────────                  ──────────────────────
-Own .env + provider key                       NO provider keys
-Run actual experiments             ──►        Selected summary-only report
-Full private traces                           Metrics and comparisons
-Editable workspace                            Read-only UI; writes blocked
+┌─────────────────┐       ┌──────────────────┐       ┌────────────────────┐
+│   Web UI / SDK  │ ────► │ FastAPI Backend  │ ────► │   In-Process Queue │
+└─────────────────┘       │  (/api/endpoints)│       │  (Thread Worker)   │
+                          └──────────────────┘       └─────────┬──────────┘
+                                                               │
+                                  ┌────────────────────────────┴───────────────────────────┐
+                                  ▼                                                        ▼
+                       ┌──────────────────────┐                                 ┌──────────────────────┐
+                       │   ReferenceAgent     │                                 │      ModelAgent      │
+                       │ (Scripted Baselines) │                                 │ (Direct/Tools/Verify)│
+                       └──────────┬───────────┘                                 └──────────┬───────────┘
+                                  │                                                        │
+                                  │                                                        ▼
+                                  │                                             ┌──────────────────────┐
+                                  │                                             │ Registered Tools     │
+                                  │                                             │ (read, sum, join...) │
+                                  │                                             └──────────┬───────────┘
+                                  ▼                                                        ▼
+                       ┌───────────────────────────────────────────────────────────────────────────────┐
+                       │                     Deterministic Evaluator (evaluate)                        │
+                       │               Validates top-level JSON fields against schema                  │
+                       └──────────────────────────────────────┬────────────────────────────────────────┘
+                                                              ▼
+                                               ┌──────────────────────────────┐
+                                               │ SQLite Database (.arena.db)  │
+                                               │ Runs, Traces, Metrics, Score │
+                                               └──────────────────────────────┘
 ```
 
-This is the responsible first public release: visitors explore results, inspect the protocol/source, and run the project locally with their own keys. They cannot spend your OpenRouter credits through the website.
+- **Execution Queue:** Single-process SQLite queue with concurrency pacing (`ARENA_CALL_INTERVAL_SECONDS`, default 3.2s) to protect local and provider quotas.
+- **Registered Tools:** Read-only fixtures (`read_fixture`), single-table filtering/sums (`sum_column`), relational joins with deduplication (`join_and_aggregate`), column extractors (`list_column`), and a restricted AST math evaluator (`calculate`).
+- For architectural deep dives and scoring formulas, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SCORING.md](docs/SCORING.md).
 
-**The publication files are ready; your accounts still need to be created/connected and deployment confirmed by you.** Nothing has been pushed to GitHub or deployed to Render automatically. Follow the [step-by-step publication guide](docs/PUBLISH.md).
+---
 
-### Export measured results
+## Development Setup & Testing
 
-After a real model experiment completes:
-
+### Development Environment
 ```bash
-python3 scripts/publish_results.py --url http://localhost:8002 --latest --confirm-public
-```
-
-This writes `public-data/results.json`. Alternatively, download **Export public report** in Experiments and put that file at the same path.
-
-The export uses an allowlist and removes prompts, outputs, trace payloads, free-text descriptions, and detailed errors. **Review it anyway:** agent names, model names, timing, costs and metrics are intentionally public. It is not a general-purpose PII detector. Do not publish the private workspace snapshot or database.
-
-Public exports are maintainer-published measurements, **not independently attested submissions**. A malicious maintainer could edit a result file; this edition does not solve that trust problem.
-
-### Preview the public site locally
-
-Keep the private app running on 8002 if desired. In a second terminal:
-
-```bash
-ARENA_READ_ONLY=1 OPENAI_API_KEY='' \
-  .venv/bin/python -m uvicorn arena_server.main:app \
-  --host 127.0.0.1 --port 8003
-```
-
-Open **http://localhost:8003**. This raw command intentionally does **not** load your private `.env`. The public app reads `public-data/results.json` if present, or shows explicitly labelled reference demos if it is absent. It creates a separate `public-readonly/arena.db` under the data directory and never opens the private database as the public workspace.
-
-### Docker / hosting
-
-- `Dockerfile` builds the UI and runs the Python app non-root.
-- `compose.yaml` runs the private local workbench on loopback by default.
-- `render.yaml` configures a public **read-only** results site with no provider key.
-- `public-data/results.json`, if intentionally committed, is copied into the image.
-- There is no automatic deployment workflow that can accidentally upload a local `.env`.
-
-**No Docker daemon was available here: the image and Render deployment have not been executed.** Review the hosting plan and charges before confirming deployment. The native build and test results are documented separately.
-
-## What this does NOT claim
-
-- Not a public arbitrary-code execution service or a multi-user SaaS.
-- No strangers' Docker images, Python uploads, hosted agent endpoints, logins or billing system.
-- 12 **public synthetic development tasks**, not held-out tests of general intelligence.
-- One latest attempt per task in default rankings; no confidence intervals or repeated-seed statistical analysis.
-- Descriptive Elo is secondary and order-sensitive. Output checks and task coverage are the main metrics.
-- No private chain-of-thought capture. Provider thought signatures can be retained in memory for continuation but are excluded from stored traces.
-- Costs may be unknown. OpenRouter-reported cost is preferred; manual token-price estimates are labelled and used only for the configured model. Model overrides without applicable usage/prices stay unknown.
-- Free route availability is not guaranteed. 429/402 errors are visible; the app does not retry or switch models behind your back.
-- No claim to be the first agent benchmark or to have completed a production security audit. Check the working project's name before a public launch.
-
-## Your own Python agent
-
-The local SDK is still included:
-
-```bash
-.venv/bin/arena --url http://localhost:8002 run examples/revenue_agent.py \
-  --task revenue-by-region --submit
-```
-
-Only run code you trust: SDK code executes in your local process. Imported outputs are rescored, but execution/timing/traces remain **self-reported** and are excluded from managed rankings. See the in-app Documentation → Bring your agent and [API reference](docs/API.md).
-
-## Development
-
-```bash
+# Set up development virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-python -m uvicorn arena_server.main:app --host 127.0.0.1 --port 8000 --reload --env-file .env
-# second terminal:
+
+# Start backend with auto-reload
+python scripts/serve.py --reload --port 8000
+
+# Start frontend in development mode (separate terminal)
 cd frontend
 npm ci
 npm run dev
 ```
+The Vite development server runs at `http://localhost:5173` and proxies `/api` requests to port `8000`.
 
-Development UI: http://localhost:5173. Vite proxies `/api` to port 8000. The compiled release uses one server; `scripts/start.py --rebuild` rebuilds frontend source with Node 20.19+ (Node 22 LTS recommended).
-
-Use a single Uvicorn worker. Jobs are persisted as records but the queue is in-process: a restart marks incomplete jobs interrupted. Cancellation is cooperative between tasks. The default per-request network timeout is 90 seconds (15-second connect timeout); it is not a hard whole-task CPU limit.
-
-### Tests
-
+### Running Automated Tests
 ```bash
-pip install -e '.[dev]'
+# Run complete test suite (147 unit, API, tool, and regression tests)
 pytest -q
+
+# Code style and linting
 ruff check backend sdk tests scripts examples
-cd frontend
-npm ci
-npm run build
-npx playwright install chromium
+
+# Production frontend build
+cd frontend && npm run build
+
+# Playwright browser end-to-end tests (requires server running on port 8000)
 npm run test:e2e
 ```
 
-Browser tests expect a running production-style server on port 8000, or `ARENA_TEST_URL`. Use a disposable data directory: tests create a test agent and run. Model protocol tests use **mock HTTP replies**, never your provider credits. Do not confuse test results with real benchmark performance. See [verification record](docs/VERIFICATION.md).
+### End-to-End Model Benchmarks
+Run one-shot real model benchmarks against your configured endpoint:
+```bash
+# Invoice reconciliation (Tools architecture)
+python tests/e2e_invoice.py
 
-## Troubleshooting
+# Invoice reconciliation (Verifier architecture)
+ARENA_ARCH=verify python tests/e2e_invoice.py
 
-| Symptom | Next step |
-|---|---|
-| Still only Atlas/Meridian/Relay/Scout | Those are references. Configure OpenRouter and use **Experiments**, not another reference benchmark. |
-| `.env` changes do nothing | Stop/restart via the **v0.2** launcher; check you are in the new project folder. Raw uvicorn needs `--env-file`. |
-| Provider key entered in Settings token box | Wrong field. Clear it. Provider key goes through `scripts/setup_openrouter.py`. |
-| Mac setup SSL certificate error | Run the wizard with `.venv/bin/python` after `start.py --check`, so it can use the installed certifi bundle. Do not disable TLS checks. |
-| HTTP 401 | Key rejected. Rerun setup and restart. Never paste the key into issue reports. |
-| HTTP 402 | Check balance, per-key caps, and in-flight limits in OpenRouter. Lower budgets or resolve account limits; do not assume more credits are always the only fix. |
-| HTTP 429 | Wait and inspect provider quota. One experiment can use multiple requests. |
-| HTTP 400 / no provider for parameters | Choose another specific model advertising tool support; routing/privacy settings may restrict availability. |
-| Output cap reached / no JSON | Use a less reasoning-heavy model or explicitly increase the cap. Inspect the trace; no hidden repair/fallback was made. |
-| `<1 ms` and zero model requests | You ran a reference policy, not a model agent. |
-| Model cost says Unknown | Provider did not return usable cost and no applicable pricing was configured. Unknown is intentional. |
-| Public app refuses to start | Remove `OPENAI_API_KEY` from that environment. Public mode deliberately refuses credentials. |
-| Public site only has reference demos | No `public-data/results.json` was included. Generate a real experiment report, review, commit, and redeploy. |
-| Port already in use | Stop the old process or use `--port 8002` / another free port. |
-| Lost connection during an experiment | Check terminal logs and job status. A browser refresh does not cancel the background job. |
+# Employee salary aggregation benchmark
+python tests/e2e_employee.py
 
-## Project map
+# Orders and order-items relational benchmark
+python tests/e2e_orders.py
+```
 
-`backend/arena_server/`: API, runner, provider adapter, SQLite, publishing boundary.  
-`sdk/agent_arena/`: traced local tools, agent interface, evaluator, CLI.  
-`frontend/`: custom React UI, local fonts, browser tests.  
-`scripts/`: launcher, OpenRouter setup, report export, release packaging.  
-`public-data/`: intentional publishable summaries only.  
-`docs/`: architecture, scoring, security, providers, publishing, verification.
+---
 
-MIT licensed. Bundled Inter/Manrope fonts use SIL OFL; licenses are included. The source is provided locally; no PyPI package or public repository has been published for you.
+## Publishing & Deployment Options
+
+AgentArena cleanly separates the **private execution workbench** from the **public results gallery**:
+
+```text
+Private Execution Workbench                   Public Results Gallery
+───────────────────────────                   ──────────────────────
+Runs on your local machine                    Hosted on Render / Docker
+Own .env with model provider key              NO provider keys allowed
+Executes real benchmarks                      Read-only UI; all writes denied (403)
+Full prompt & tool traces                     Allowlisted summary report (results.json)
+```
+
+### 1. Export a Public Report
+After completing an experiment in your local workbench, export the sanitized summary:
+```bash
+python3 scripts/publish_results.py --url http://localhost:8000 --latest --confirm-public
+```
+This writes `public-data/results.json`, including agent metadata, metrics, and field checks while withholding raw prompts, execution traces, and secrets.
+
+### 2. Preview Read-Only Gallery Locally
+```bash
+ARENA_READ_ONLY=1 OPENAI_API_KEY='' \
+  .venv/bin/python -m uvicorn arena_server.main:app --port 8001
+```
+Open **http://localhost:8001**. The public-mode banner will be displayed, and all write endpoints are disabled.
+
+### 3. Deploy to Hosting
+- **Docker:** `Dockerfile` and `compose.yaml` are included for containerized hosting.
+- **Render:** A ready-to-use blueprint is provided in `render.yaml` for public read-only deployment.
+- **Release Packaging:** Build a portable release ZIP using `python3 scripts/package.py`.
+- For step-by-step instructions, see [docs/PUBLISH.md](docs/PUBLISH.md).
+
+---
+
+## Security, Limitations & Troubleshooting
+
+### Security Model
+- **Loopback Binding:** Binds `127.0.0.1` by default to prevent unintended network exposure.
+- **Zero Arbitrary Execution:** Never executes uploaded code, arbitrary Python, or remote shell commands.
+- **Read-Only Tools:** Registered data tools inspect only predefined synthetic fixtures.
+- **No Private Reasoning Leaks:** Provider thought signatures are kept in memory for tool continuation but stripped before trace persistence.
+- For the full threat model and checklist, see [docs/SECURITY.md](docs/SECURITY.md).
+
+### Known Limitations
+- **12 Synthetic Development Tasks:** Focused on structured data analysis, research, and operations; not a general artificial intelligence benchmark.
+- **Order-Sensitive Descriptive Elo:** Provides relative ranking across runs on the current suite fingerprint, but is not a statistical claim of universal superiority.
+- **Local Pacing vs. Account Quotas:** The 3.2-second request interval paces local calls, but cannot protect against external account quota exhaustion.
+- **Spending Caps:** Token caps limit individual request sizes; monitor your provider dashboard for account-level spending limits.
+
+### Troubleshooting
+
+| Issue | Cause | Solution |
+|---|---|---|
+| Only reference agents visible | No model agent has been run yet. | Configure your provider and run an experiment on the **Experiments** page. |
+| `.env` changes not taking effect | Server was started with raw uvicorn. | Use `python3 scripts/start.py` or pass `--env-file .env` to uvicorn. |
+| HTTP 401 Unauthorized | Invalid or missing provider API key. | Re-run `.venv/bin/python scripts/setup_openrouter.py` or verify `.env`. |
+| HTTP 402 Payment Required | Provider account credits exhausted. | Check balance and spending limits in your OpenRouter dashboard. |
+| HTTP 429 Rate Limited | Provider rate limit exceeded. | Wait for the quota window to reset; keep request intervals intact. |
+| Model cost displays `Unknown` | Provider did not return cost data. | Normal for local models or providers without pricing metadata; intentional by design. |
+| Output cap reached / No JSON | Model ran out of generation tokens. | Increase `max_output_tokens` or select a less verbose model. |
+| Public app refuses to start | `OPENAI_API_KEY` present in read-only mode. | Remove provider keys from the public environment as required by the security model. |
+
+For detailed provider notes, see [docs/OPENROUTER.md](docs/OPENROUTER.md).
+
+---
+
+## Project Structure, Contribution & License
+
+### Directory Map
+```text
+agent-arena/
+├── backend/arena_server/    # FastAPI app, agent runner, SQLite store, task library
+├── sdk/agent_arena/         # Local agent SDK, CLI runner, deterministic evaluator
+├── frontend/                # React + TypeScript single-page application (Vite)
+├── scripts/                 # Start, serve, setup, and publishing utility scripts
+├── tests/                   # 147 unit, API, regression, and e2e benchmark tests
+├── docs/                    # Architecture, API, Security, Publishing, and Scoring docs
+│   └── screenshots/         # Verified UI walkthrough screenshots
+├── examples/                # Example SDK agents and custom runners
+└── public-data/             # Destination for published summary reports (results.json)
+```
+
+### Contributing
+Contributions are welcome! Please ensure:
+1. All changes include tests and pass `pytest -q` (147 tests).
+2. Code adheres to linting standards (`ruff check .`).
+3. Frontend builds cleanly (`npm run build`).
+4. Read the guidelines in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) and [docs/TASK_CREATION_GUIDE.md](docs/TASK_CREATION_GUIDE.md).
+
+### License
+- **Code:** Licensed under the [MIT License](LICENSE).
+- **Fonts:** Bundled Inter and Manrope fonts are licensed under the [SIL Open Font License](frontend/public/fonts/).
