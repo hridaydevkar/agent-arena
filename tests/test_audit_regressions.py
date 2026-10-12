@@ -9,6 +9,7 @@ Tests cover:
 6. Independent verification correcting an intentionally wrong draft without model calls.
 """
 
+import json
 import pytest
 from agent_arena import ToolContext, evaluate
 from arena_server.agents import (
@@ -363,4 +364,121 @@ def test_verifier_independent_draft_correction(monkeypatch):
     assert res.output == {"total_salary": 500}
     ev = evaluate(res.output, task_def["expected"])
     assert ev["passed"] is True
+
+
+def test_verifier_does_not_select_non_deduplicated_candidate_result(monkeypatch):
+    """Verify that when multiple candidate join results exist (one with dedup, one without),
+    the verifier prompt explicitly enforces selecting the deduplicated result."""
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    agent = ModelAgent("test-model", "verify", max_calls=4)
+
+    task_def = {
+        "id": "invoice-reconciliation",
+        "title": "Reconcile a messy invoice ledger",
+        "category": "Data analysis",
+        "operation": "invoices",
+        "description": "Read invoices and payments. Ignore void invoices. Exclude duplicate payments with the same payment_id.",
+        "inputs": {
+            "invoices": [
+                {"id": "INV-101", "amount": 1200, "status": "open"},
+                {"id": "INV-102", "amount": 800, "status": "open"},
+                {"id": "INV-103", "amount": 500, "status": "void"},
+                {"id": "INV-104", "amount": 600, "status": "open"},
+            ],
+            "payments": [
+                {"payment_id": "P1", "invoice_id": "INV-101", "amount": 1200},
+                {"payment_id": "P2", "invoice_id": "INV-102", "amount": 300},
+                {"payment_id": "P2", "invoice_id": "INV-102", "amount": 300},
+                {"payment_id": "P3", "invoice_id": "INV-103", "amount": 500},
+            ],
+        },
+        "output_schema": {
+            "billed_total": "int",
+            "paid_total": "int",
+            "outstanding_total": "int",
+            "unpaid_invoice_ids": "list",
+        },
+        "expected": {
+            "billed_total": 2600,
+            "paid_total": 1500,
+            "outstanding_total": 1100,
+            "unpaid_invoice_ids": ["INV-102", "INV-104"],
+        },
+    }
+    from agent_arena import Task
+    task = Task.from_dict(task_def)
+    tools = ToolContext(task)
+
+    draft = json.dumps({
+        "billed_total": 2600,
+        "paid_total": 1500,
+        "outstanding_total": 1100,
+        "unpaid_invoice_ids": ["INV-102", "INV-104"],
+    })
+    verified_answer = json.dumps({
+        "billed_total": 2600,
+        "paid_total": 1500,
+        "outstanding_total": 1100,
+        "unpaid_invoice_ids": ["INV-102", "INV-104"],
+    })
+
+    prompts_seen = []
+    calls = 0
+
+    def mock_post(url, json=None, headers=None, timeout=None):
+        nonlocal calls
+        calls += 1
+        messages = json.get("messages", [])
+        prompts_seen.append(messages)
+
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self):
+                # Turn 1: solver produces draft
+                if calls == 1:
+                    return {"choices": [{"message": {"content": draft}}]}
+                # Turn 2: verifier issues multiple tool calls:
+                # call 1: sum_column (2600)
+                # call 2: join_and_aggregate with dedup (1500)
+                # call 3: join_and_aggregate WITHOUT dedup (1800)
+                elif calls == 2:
+                    return {"choices": [{"message": {
+                        "content": "",
+                        "tool_calls": [
+                            {"id": "c1", "type": "function", "function": {
+                                "name": "sum_column",
+                                "arguments": '{"table": "invoices", "column": "amount", "filter": "status != \\"void\\""}'
+                            }},
+                            {"id": "c2", "type": "function", "function": {
+                                "name": "join_and_aggregate",
+                                "arguments": '{"table": "invoices", "right_table": "payments", "join": "invoice_id", "dedup": "payment_id", "filter": "status != \\"void\\"", "columns": "amount", "group": "invoice_id"}'
+                            }},
+                            {"id": "c3", "type": "function", "function": {
+                                "name": "join_and_aggregate",
+                                "arguments": '{"table": "invoices", "right_table": "payments", "join": "invoice_id", "filter": "status != \\"void\\"", "columns": "amount", "group": "invoice_id"}'
+                            }},
+                        ]
+                    }}]}
+                # Turn 3: verifier produces final answer
+                else:
+                    return {"choices": [{"message": {"content": verified_answer}}]}
+        return MockResponse()
+
+    import httpx
+    monkeypatch.setattr(httpx.Client, "post", lambda self, *a, **kw: mock_post(*a, **kw))
+
+    res = agent.run(task, tools)
+    assert res.output["paid_total"] == 1500
+    assert res.output["outstanding_total"] == 1100
+    assert res.output["unpaid_invoice_ids"] == ["INV-102", "INV-104"]
+
+    # Check the final prompt sent to the verifier in Turn 3
+    final_messages = prompts_seen[-1]
+    user_messages = [m for m in final_messages if m.get("role") == "user"]
+    final_user_msg = user_messages[-1]["content"]
+    assert "When the task explicitly requires deduplication" in final_user_msg
+    assert "Never substitute or select a similar result from a call that omitted the required deduplication" in final_user_msg
+    assert "deduplicated join_and_aggregate result of 1500" in final_user_msg
+
 

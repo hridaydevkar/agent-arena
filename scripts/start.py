@@ -26,6 +26,9 @@ def main():
     )
     parser.add_argument("--rebuild", action="store_true", help="Rebuild UI from source; requires Node 20.19+ and npm")
     parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload on code changes (dev mode)"
+    )
+    parser.add_argument(
         "--check", action="store_true", help="Install/check dependencies and UI, then exit without starting a server"
     )
     args = parser.parse_args()
@@ -84,7 +87,10 @@ def main():
         flush=True,
     )
     # One worker only: the executor is intentionally in-process.
-    run([python, ROOT / "scripts/serve.py", "--host", args.host, "--port", str(args.port)])
+    serve_cmd = [python, ROOT / "scripts/serve.py", "--host", args.host, "--port", str(args.port)]
+    if args.reload:
+        serve_cmd.append("--reload")
+    run(serve_cmd)
 
 
 if __name__ == "__main__":

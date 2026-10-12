@@ -173,3 +173,31 @@ def test_current_suite_excludes_stale_run(client):
 def test_seed_idempotent(client):
     app.state.engine.seed()
     assert client.get("/api/runs").json()["total"] == 48
+
+
+def test_verifier_max_calls_boundary(client, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    # Verify architecture: max_calls = 3 must be rejected with 422
+    res_three = client.post(
+        "/api/agents",
+        json={"name": "Verifier-3", "strategy": "model", "architecture": "verify", "max_calls": 3},
+    )
+    assert res_three.status_code == 422
+    assert "at least four model calls" in res_three.text
+
+    # Verify architecture: max_calls = 4 must be accepted with 201
+    res_four = client.post(
+        "/api/agents",
+        json={"name": "Verifier-4", "strategy": "model", "architecture": "verify", "max_calls": 4},
+    )
+    assert res_four.status_code == 201
+    assert res_four.json()["architecture"] == "verify"
+    assert res_four.json()["max_calls"] == 4
+
+    # Other architectures (direct, tools) with max_calls = 3 must NOT be rejected by this check
+    res_tools = client.post(
+        "/api/agents",
+        json={"name": "Tools-3", "strategy": "model", "architecture": "tools", "max_calls": 3},
+    )
+    assert res_tools.status_code == 201
+

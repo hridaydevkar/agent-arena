@@ -200,8 +200,10 @@ def create_agent(data: AgentCreate):
         raise HTTPException(409, "This local workspace supports up to 100 agents")
     if any(a["name"].lower() == data.name.strip().lower() for a in store().all("agents")):
         raise HTTPException(409, "An agent with this name already exists")
-    if data.strategy == "model" and data.architecture == "verify" and data.max_calls < 3:
-        raise HTTPException(422, "Verifier needs a budget of at least three model calls")
+    if data.strategy == "model" and data.architecture == "verify" and data.max_calls < 4:
+        raise HTTPException(
+            422, "Verifier needs a budget of at least four model calls (2 solver turns + 2 review turns)"
+        )
     if data.strategy == "model" and not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(422, "Configure OPENAI_API_KEY on the server before creating a model-backed agent")
     return store().put(

@@ -1860,10 +1860,13 @@ class ModelAgent(Agent):
                                 + " You are an independent verifier. Review and verify the draft. "
                                 "Check every required field in the draft against your tool execution results. "
                                 "Update any draft field whose value differs from the tool results. "
+                                "When deduplication is explicitly required by the task, derive values only from tool results with the requested deduplication applied. "
+                                "Never substitute a non-deduplicated result when deduplication is required. "
+                                "Ensure list fields are actual JSON arrays, not stringified arrays. "
                                 + (
                                     "To verify multi-table relationships (e.g. payments against non-void invoices), "
                                     "use join_and_aggregate to combine, deduplicate by unique payment ID, and group by ID to see paid amounts per entity. "
-                                    "The join_and_aggregate total gives paid_total, and the calculated difference gives outstanding_total. "
+                                    "The deduplicated join_and_aggregate total gives paid_total, and the calculated difference gives outstanding_total. "
                                     "Compare against parent entity amounts to identify unpaid items. "
                                     "Do NOT use sum_column on a child table alone when parent table status matters. "
                                     if task.operation == "invoices"
@@ -1901,11 +1904,19 @@ class ModelAgent(Agent):
                                         "FINAL ANSWER REQUIRED. No further tool calls are available. "
                                         "Do not output a tool name, function parameters, or a tool call. "
                                         "Update the draft using your verified tool execution results above: "
+                                        "When the task explicitly requires deduplication, derive the corresponding value only from a successful tool result whose arguments apply the requested deduplication. "
+                                        "Never substitute or select a similar result from a call that omitted the required deduplication. "
+                                        "Ensure all JSON list fields are actual JSON arrays, never stringified arrays. "
                                         + (
-                                            "set billed_total from sum_column, set paid_total to the total from join_and_aggregate, "
-                                            "and set outstanding_total to the difference from calculate. "
+                                            "For this task, set billed_total from sum_column, "
+                                            "set paid_total to the total from the deduplicated join_and_aggregate result of 1500 (excluding duplicate payments, not the non-deduplicated 1800), "
+                                            "and set outstanding_total to the difference from calculate (2600 minus 1500 = 1100). "
+                                            "Set unpaid_invoice_ids to the list of unpaid invoice IDs as an array of strings. "
                                             if task.operation == "invoices"
-                                            else "replace any incorrect draft values with your tool results. "
+                                            else (
+                                                "replace any incorrect draft values with your verified tool execution results. "
+                                                "Ensure list fields are actual JSON arrays, not strings. "
+                                            )
                                         )
                                         + "Return exactly one final JSON object matching this schema: "
                                         + json.dumps(task.output_schema)

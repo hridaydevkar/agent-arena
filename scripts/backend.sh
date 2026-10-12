@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run just the Python backend.
-# Usage: bash scripts/backend.sh [--port 8000] [--host 127.0.0.1]
+# Usage: bash scripts/backend.sh [--port 8000] [--host 127.0.0.1] [--reload]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,4 +11,9 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-exec "$PYTHON" "$ROOT/scripts/serve.py" "$@"
+RELOAD_ARGS=()
+if [[ "${ARENA_RELOAD:-}" == "1" || "${ARENA_RELOAD:-}" == "true" ]]; then
+  RELOAD_ARGS=(--reload)
+fi
+
+exec "$PYTHON" "$ROOT/scripts/serve.py" "${RELOAD_ARGS[@]}" "$@"
