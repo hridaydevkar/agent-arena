@@ -126,7 +126,9 @@ export async function api<T>(
       msg.includes("Failed to fetch") ||
       msg.includes("NetworkError") ||
       msg.includes("Load failed") ||
-      msg.includes("Connection refused")
+      msg.includes("Connection refused") ||
+      msg.includes("Unexpected token") ||
+      msg.includes("not valid JSON")
     ) {
       staticFallbackActive = true;
       return handleStaticApi<T>(path, options);
