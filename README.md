@@ -113,7 +113,6 @@ Open **http://localhost:8000** in your browser.
 > **Cross-Platform Notes:**
 > - **macOS / Linux:** Use the commands above. For auto-reload during development, use `python scripts/serve.py --reload`.
 > - **Windows:** Run `py scripts/start.py --check`, then `.venv\Scripts\python.exe scripts/setup_openrouter.py`, then `py scripts/start.py --port 8000`.
-> - For a detailed walkthrough, see [QUICKSTART.md](QUICKSTART.md).
 
 ---
 

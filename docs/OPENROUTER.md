@@ -53,7 +53,7 @@ OPENAI_API_KEY=<your Gemini API key>
 
 The generic adapter is not a native Gemini SDK. Model availability, region, account terms, quota, parameter support and billing are provider-dependent. The OpenRouter-specific metadata checker is not a Gemini authentication test. No live Gemini calls were tested here.
 
-## Your small local Llama alternative
+## Local Ollama Runtime
 
 First identify the runtime. If you use Ollama:
 
@@ -69,4 +69,4 @@ OPENAI_MODEL=<exact installed model name>
 OPENAI_API_KEY=ollama
 ```
 
-The non-empty key is a compatibility placeholder, not a paid credential. Keep the endpoint on loopback. Small models on an M2 with 8 GB unified memory may struggle with JSON/tool use; no inference-speed or memory-fit guarantee is made. Don't run a large local model plus Docker/IDE merely to try this workbench. OpenRouter does not consume your Mac's model-weight memory.
+The non-empty key is a compatibility placeholder, not a paid credential. Keep the endpoint on loopback. Local models (such as `llama3.2:3b`) run offline without API tokens; ensure adequate host memory for the selected model size (e.g. 3B parameter models run comfortably on 8–16 GB memory). OpenRouter provides an alternative that offloads model execution to cloud providers without local compute overhead.

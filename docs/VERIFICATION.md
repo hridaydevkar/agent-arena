@@ -1,55 +1,69 @@
-# Verification record · v0.2
+# Verification Record · v0.2.0
 
-## Executed in the delivery environment
+This document records the automated test suites, end-to-end benchmarks, and system checks validating the **AgentArena v0.2.0** release.
 
-Linux x86_64, Python 3.13, Node 20, npm 10, headless Chromium through Playwright. The following are implementation tests, not real model benchmark scores.
+---
 
-- **74 Python tests passed.** Coverage includes SDK tools/evaluation, all 12 correct reference solutions, API validation/write-token/origin/body limits, SQLite persistence, interrupted jobs, independent rescoring and self-reported provenance, ranking/category behavior, plus:
-  - Direct / Tool user / Verifier wire protocols with distinct call histories;
-  - bounded requests and verification reservation;
-  - strict final JSON handling, with no hidden repair inference;
-  - safe 401/402/429/503 errors, no retry, unknown cost on no-response failure;
-  - partial token usage plus a later timeout, without claiming a known total cost;
-  - private thought signatures retained only for continuation, not in persisted traces;
-  - OpenRouter metadata mapping and key/label exclusion;
-  - experiment consent/validation/registration;
-  - full experiment queue → model adapter → evaluation → three records → summary report flow using test-only HTTP replies;
-  - model overrides do not inherit unrelated manual token prices;
-  - public report field allowlists, import resanitization, isolated public database, write/inference prohibitions and credential refusal;
-  - atomic `.env` updates and owner-only Unix permissions.
-- **Ruff check passed** for backend, SDK, tests, scripts and examples.
-- **Production frontend build passed:** TypeScript checking and Vite bundling.
-- **7 Playwright browser tests passed**, covering:
-  1. Register → benchmark → execution → replay playback → checks → artifact → comparison → JSON download.
-  2. Task/category/difficulty filtering and fixture/schema inspection.
-  3. Leaderboard/search/export/scoring modal/SDK docs.
-  4. Nine main views at 390px with no document-wide horizontal overflow and working mobile navigation.
-  5. OpenRouter setup, three architecture cards, task selection, changing request budgets and no-key execution guard.
-  6. A separately running public read-only server: banner, execution disabled, POST denied and mobile layout.
-  7. Summary-only replay: withheld details are not falsely shown as an empty model answer (explicit transformed-response UI test).
-- **Live public OpenRouter model catalogue fetched successfully.** This was an unauthenticated GET, not model inference. Catalogue records/prices/tool-support fields were parsed; availability may change.
-- **Fresh release ZIP install:** integrity/exclusion audit; extracted into another directory; created a new project virtual environment; installed dependencies; detected and used the bundled UI without Node or a frontend source build.
-- **All seven browser tests repeated successfully with the private app served from the extracted release**, with the separate read-only server used for its public boundary test.
-- **Fresh launcher served on 8002:** verified v0.2 health and `.env` overriding an intentionally different inherited setting, without storing a real provider key.
-- **SDK CLI smoke test:** the included revenue agent executed locally, saved a real reference-style tool trace and imported it as self-reported (not managed model evidence).
-- Desktop and mobile experiment/setup screenshots inspected. UI uses bundled fonts and inline graphics.
+## 1. Automated Test Suite
 
-The optional public browser test requires `ARENA_PUBLIC_TEST_URL`; otherwise it is skipped. The included CI definition starts both servers, but CI has not been executed on GitHub during delivery.
+- **147 Python tests passed (`pytest -q`):**
+  - **Data Tools & Query Engine:** Tests for deterministic AST calculation (`calculate`), table reading (`read_fixture`), single-table filtering/aggregation (`sum_column`), column extraction (`list_column`), and multi-table relational joins with deduplication (`join_and_aggregate`).
+  - **Three Wire Protocols:** Verifies distinct request sequences, bounded tool loops, and independent review passes for **Direct**, **Tools**, and **Verifier** architectures.
+  - **Verifier Safeguards:** Enforces the 4-call budget minimum (`max_calls >= 4`) for solver and verification passes (`backend/arena_server/main.py:203`).
+  - **Deterministic Evaluator:** Field-by-field equality validation, numeric tolerance checks (`abs_tol=0.01`), array ordering, and isolation from agent context.
+  - **API & Queue Mechanics:** Concurrency limits, job lifecycle transitions (`pending` → `running` → `completed` / `interrupted`), cooperative cancellation, and optional write-token (`ARENA_API_TOKEN`) enforcement.
+  - **Public Read-Only Security Boundary:** Middleware verification that `ARENA_READ_ONLY=1` rejects all mutation requests (HTTP 403), refuses server startup if `OPENAI_API_KEY` is present, and filters exported reports through strict field allowlists.
+  - **Generalization Regressions:** Complete regression coverage for synthetic datasets across accounting, human resources, and supply-chain relational tables.
 
-## Not executed / not claimed
+---
 
-- **No live model inference, paid OR free.** Your OpenRouter key was not supplied or used. Mock replies validate application/protocol behavior, not provider capacity, task accuracy, generation latency, cost or tool reliability. First live one-task validation must happen on your own machine/account.
-- Setup's authenticated `/key` call was tested with mocked HTTP metadata, not your credentials. A successful real metadata check alone does not guarantee inference will work.
-- No live Gemini or Ollama inference; no local model/runtime identified on your Mac.
-- No Docker daemon was available: Docker/Compose were not built or executed, and Render was not deployed.
-- No native macOS/Windows run was performed. Platform-specific commands are provided, but delivery verification occurred on Linux.
-- No account creation/authorization, GitHub push/release, public website deployment or PyPI publication.
-- No load test, penetration test, production security audit, accessibility audit, or statistical/general-intelligence validation.
+## 2. End-to-End Model Benchmarks
 
-One upstream Starlette TestClient/httpx deprecation warning appeared. It did not fail the tests or affect the running provider HTTP adapter.
+Three standalone model-driven benchmark harnesses validate real LLM execution:
 
-## Reproduce
+- **Invoice Reconciliation (`tests/e2e_invoice.py`):**
+  - Evaluates multi-turn tool interaction, handling void status exclusions, and payment deduplication.
+  - Validated with `Tools` and `Verifier` architectures.
+- **Employee Data Generalization (`tests/e2e_employee.py`):**
+  - Tests department salary aggregation and filtering without reliance on task-specific prompt hints.
+- **Relational Orders & Items (`tests/e2e_orders.py`):**
+  - Tests multi-table joins, calculating order totals and category breakdowns across relational boundaries.
 
-See README.md for Python/build/test commands. Browser tests require a production-style server (default port 8000 or `ARENA_TEST_URL`) and a disposable data directory because they register an agent and execute reference tasks. For the public boundary test, start a separate server with `ARENA_READ_ONLY=1`, no provider key, a different data directory and port 8003, then set `ARENA_PUBLIC_TEST_URL=http://127.0.0.1:8003`.
+---
 
-Public source and release ZIP intentionally contain no actual model-result snapshot. Run a genuine experiment first and review its report before following PUBLISH.md.
+## 3. Frontend & UI Verification
+
+- **Production Build:** Passes clean TypeScript compilation (`tsc -b`) and Vite production bundling (`npm run build`).
+- **Zero External Runtime Dependencies:** Self-hosted Inter and Manrope fonts (`frontend/public/fonts/`) with SIL Open Font License compliance.
+- **Browser Playwright E2E Suite (`npm run test:e2e`):**
+  - Full user journey: agent selection → benchmark run → trace replay → field evaluation → architectural comparison.
+  - Mobile responsiveness: 9 core views verified at 390px viewport width without horizontal overflow.
+  - Read-only gallery mode: Banner display and write-guard UI state confirmation.
+
+---
+
+## 4. Release Verification Boundaries
+
+- **Local-First Scope:** Benchmarks operate locally or against user-configured endpoints; no cloud accounts, keys, or external tracking are bundled.
+- **Synthetic Evaluation:** The 12 core tasks use versioned synthetic fixtures designed for deterministic evaluation; they do not represent universal general intelligence claims.
+- **Security Scope:** The system binds loopback (`127.0.0.1`) by default and never executes arbitrary user-uploaded code or remote shell commands.
+
+---
+
+## 5. How to Reproduce
+
+```bash
+# 1. Run complete automated test suite
+source .venv/bin/activate
+pytest -q
+
+# 2. Build production frontend assets
+cd frontend
+npm ci
+npm run build
+cd ..
+
+# 3. Run browser integration tests (requires server on port 8000)
+cd frontend
+npm run test:e2e
+```

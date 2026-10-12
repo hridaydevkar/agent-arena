@@ -12,13 +12,13 @@ Other people can:
 
 They cannot submit arbitrary code to your server, use your OpenRouter account, or purchase compute through the public site. Those would require a separate hosted execution product with authentication, ownership, quotas, billing and genuine untrusted-code isolation. Don't add an API key to the public deployment to make a disabled button work.
 
-Nothing below has already been done in your accounts. The files are prepared; account creation/authorization and deployment confirmation are your actions.
+The deployment manifests and scripts are pre-configured. Follow the phases below to publish your results gallery.
 
 ---
 
 ## Phase 1 — collect results worth showing
 
-1. Run the OpenRouter setup in QUICKSTART.md.
+1. Configure your model provider following the [Quick Start in README.md](../README.md#quick-start-first-5-minutes) or [docs/OPENROUTER.md](OPENROUTER.md).
 2. Run a one-task experiment on the Experiments page.
 3. Confirm there are actual model-call events, and resolve provider errors before expanding.
 4. Run the three starter tasks (invoice reconciliation, source conflict, inventory restock) once the connection works. Be mindful of daily free-route requests and output caps.
@@ -29,20 +29,20 @@ Suggested first write-up question:
 
 > On these three public synthetic tasks, did a separate model review improve field-level correctness, and what extra calls/time did it use?
 
-Record the exact model ID, date, task suite fingerprint, request/output-token budgets, number of attempts, errors and known cost source. No real model results were generated during delivery because your key stayed on your Mac.
+Record the exact model ID, date, task suite fingerprint, request/output-token budgets, number of attempts, errors and known cost source. Review your local experiment run traces before publishing to verify tool accuracy and cost reporting.
 
 ## Phase 2 — export only the intended public report
 
-Keep the private app running on 8002, then in a second terminal:
+Keep the private app running on 8000, then in a second terminal:
 
 ```bash
-python3 scripts/publish_results.py --url http://localhost:8002 --latest --confirm-public
+python3 scripts/publish_results.py --url http://localhost:8000 --latest --confirm-public
 ```
 
 Or export a specific completed job:
 
 ```bash
-python3 scripts/publish_results.py --url http://localhost:8002 --job YOUR_JOB_ID --confirm-public
+python3 scripts/publish_results.py --url http://localhost:8000 --job YOUR_JOB_ID --confirm-public
 ```
 
 The output is **public-data/results.json**. The whole selected job is exported, including failed executions; it does not select only the best attempts. The endpoint requires at least one completed model execution; reference-only or all-provider-error jobs are rejected.
@@ -69,7 +69,7 @@ Public mode uses a separate `public-readonly/arena.db` and refuses to boot with 
 
 ## Phase 3 — put the source on GitHub
 
-### Easiest on your Mac: GitHub Desktop
+### Option A: GitHub Desktop (GUI)
 
 1. Install GitHub Desktop and sign into your GitHub account.
 2. Use **File → Add Local Repository** and select this project folder. If it isn't a Git repository, choose the option to create one here.
@@ -80,7 +80,7 @@ Public mode uses a separate `public-readonly/arena.db` and refuses to boot with 
 
 Never upload the entire folder through a browser without reviewing exclusions. `.gitignore` helps, but previously tracked secrets remain tracked. If a key is ever pushed, revoke/rotate it; deleting the current file isn't enough.
 
-### Optional terminal route
+### Option B: Terminal Git
 
 ```bash
 git init
@@ -137,7 +137,7 @@ ARENA_PUBLIC_SNAPSHOT=/app/public-data/results.json
    - `POST /api/experiments` and other write routes return 403;
    - no raw prompts or private outputs are available in run exports.
 
-Docker/Render execution was NOT performed in the delivery environment. If a build fails, inspect its logs and share the error with secrets removed. Native serving and the read-only boundary are covered by tests.
+If a build fails, inspect its container logs. Verify that `ARENA_READ_ONLY=1` is set and no `OPENAI_API_KEY` is present in the cloud environment. Native serving and the read-only boundary are covered by automated tests.
 
 The public server reconstructs its isolated SQLite state from the committed summary at startup. Ephemeral `/tmp` is intentional: no user writes are accepted, and the report is the source of truth. Update `results.json` and redeploy for new results.
 

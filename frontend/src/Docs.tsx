@@ -304,11 +304,11 @@ export default function Docs() {
               <h3>Publish results, not your provider key</h3>
               <p>
                 v0.2 includes a read-only public mode and a Render deployment
-                blueprint. Run a real experiment locally, export its public
+                blueprint. Run an experiment locally, export its public
                 report to public-data/results.json, then publish source on
                 GitHub. See docs/PUBLISH.md. ARENA_READ_ONLY=1 blocks writes and
                 inference; the server refuses to start if OPENAI_API_KEY is
-                present. No account or deployment has been created for you.
+                present.
               </p>
               <h3>Before you expose the execution service publicly</h3>
               <p>

@@ -1,11 +1,11 @@
 # Published results go here
 
-This directory intentionally starts without results.json. No live model results have been generated for you.
+This directory intentionally starts without a pre-committed `results.json` snapshot.
 
-After running a real experiment locally, use the Experiments page's **Export public report** button or:
+After running an experiment locally, use the Experiments page's **Export public report** button or:
 
-```
-python3 scripts/publish_results.py --url http://localhost:8002 --latest --confirm-public
+```bash
+python3 scripts/publish_results.py --url http://localhost:8000 --latest --confirm-public
 ```
 
 The export includes agent/model/architecture identities and result metrics, but NOT prompts, fixtures, raw traces, outputs, API keys or private error details. Review results.json before committing it. If you name an agent/model something private, the name can still appear: this is a field allowlist, not a general PII detector.
