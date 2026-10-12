@@ -112,13 +112,30 @@ Create a GitHub Release (`v0.2.0`) and attach that ZIP. The packager intentional
 
 Update the README's actual repository/release/demo links after they exist. Do not insert made-up URLs or claim the SDK is on PyPI.
 
-## Phase 4 — deploy the PUBLIC results site
+## Phase 4 — deploy the PUBLIC results showcase
 
-A **Render blueprint** is provided in `render.yaml`. You can use another Docker-capable host with the same environment settings.
+### Option A: GitHub Pages (Recommended — 100% Free, No Credit Card Required)
+
+A GitHub Actions workflow is provided at `.github/workflows/deploy-pages.yml` to build and publish a static, read-only showcase of AgentArena directly on GitHub Pages. It requires zero billing setup, no credit card, and no backend server maintenance:
+
+1. **Enable GitHub Pages via Actions:**
+   - In your GitHub repository, go to **Settings** → **Pages**.
+   - Under **Build and deployment** → **Source**, select **GitHub Actions**.
+2. **Deploy:**
+   - Push to `main` or trigger the workflow manually from **Actions** → **Deploy Static Demo to GitHub Pages** → **Run workflow**.
+   - The workflow installs frontend dependencies, compiles the static demo bundle (`VITE_STATIC_DEMO=true npm run build`), configures 404 fallbacks for SPA client-side routing, and deploys the artifact to GitHub Pages.
+3. **Verify:**
+   - Open your GitHub Pages URL (`https://<username>.github.io/<repo-name>/`).
+   - Confirm all views load: Overview, Leaderboard, Tasks, Runs, Replay, and Experiments.
+   - The demo runs 100% client-side with bundled public benchmark data, making zero calls to localhost or private inference servers.
+
+### Option B: Containerized Hosting (Render / Docker)
+
+A **Render blueprint** is provided in `render.yaml` for users who prefer containerized hosting. Note that cloud container providers (such as Render) may request credit card verification:
 
 1. Log into Render and connect the reviewed GitHub repo.
 2. Create a new **Blueprint** from that repo (Render reads `render.yaml`).
-3. Review the proposed service, region, compute plan, and any charges before approving. Availability and pricing are provider-dependent; no hosting tier is promised free.
+3. Review the proposed service, region, compute plan, and any charges before approving.
 4. Confirm these environment settings:
 
 ```text
@@ -136,10 +153,6 @@ ARENA_PUBLIC_SNAPSHOT=/app/public-data/results.json
    - direct refreshes of `/leaderboard`, `/experiments` and `/compare` work;
    - `POST /api/experiments` and other write routes return 403;
    - no raw prompts or private outputs are available in run exports.
-
-If a build fails, inspect its container logs. Verify that `ARENA_READ_ONLY=1` is set and no `OPENAI_API_KEY` is present in the cloud environment. Native serving and the read-only boundary are covered by automated tests.
-
-The public server reconstructs its isolated SQLite state from the committed summary at startup. Ephemeral `/tmp` is intentional: no user writes are accepted, and the report is the source of truth. Update `results.json` and redeploy for new results.
 
 ## Phase 5 — tell a credible launch story
 

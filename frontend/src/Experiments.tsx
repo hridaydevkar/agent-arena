@@ -84,12 +84,16 @@ export default function Experiments() {
   );
 
   useEffect(() => {
-    if (!jobId || health.read_only) return;
+    const targetId = jobId || recentModelJobs[0]?.id;
+    if (!targetId) return;
+    if (!jobId && recentModelJobs[0]?.id) {
+      setJobId(recentModelJobs[0].id);
+    }
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const next = await api<Job>(`/jobs/${jobId}`);
+        const next = await api<Job>(`/jobs/${targetId}`);
         if (!live) return;
         const records = await api<{ items: Run[] }>(
           `/runs?job_id=${encodeURIComponent(next.id)}&limit=100`,
@@ -98,9 +102,9 @@ export default function Experiments() {
         setSelectedRuns(records.items);
         setJob(next);
         setJobError("");
-        if (["queued", "running"].includes(next.status))
+        if (!health.read_only && ["queued", "running"].includes(next.status))
           timer = setTimeout(poll, 1500);
-        else await refresh();
+        else if (!health.read_only) await refresh();
       } catch (e) {
         if (live) setJobError((e as Error).message);
       }
@@ -112,7 +116,7 @@ export default function Experiments() {
       live = false;
       clearTimeout(timer);
     };
-  }, [jobId, health.read_only]);
+  }, [jobId, recentModelJobs.length, health.read_only]);
 
   async function loadModels() {
     setCatalogBusy(true);
@@ -484,8 +488,10 @@ export default function Experiments() {
               </div>
             )}
           </section>
-          {(job || recentModelJobs.length > 0 || jobError) && (
-            <section className="card experiment-results">
+        </>
+      )}
+      {(job || recentModelJobs.length > 0 || jobError) && (
+        <section className="card experiment-results">
               <div className="section-head">
                 <div>
                   <h2>
@@ -665,8 +671,6 @@ export default function Experiments() {
               )}
             </section>
           )}
-        </>
-      )}
       <div className="notice">
         <ShieldCheck size={19} />
         <span>

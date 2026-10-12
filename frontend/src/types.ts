@@ -60,6 +60,7 @@ export type Run = {
   cost_source?: string;
   resolved_models?: string[];
   visibility?: string;
+  job_id?: string;
   id: string;
   agent_id: string;
   agent_name: string;

@@ -230,34 +230,34 @@ python tests/e2e_orders.py
 
 ## Publishing & Deployment Options
 
-AgentArena cleanly separates the **private execution workbench** from the **public results gallery**:
+AgentArena cleanly separates the **private execution workbench** from the **public results showcase**:
 
 ```text
-Private Execution Workbench                   Public Results Gallery
-───────────────────────────                   ──────────────────────
-Runs on your local machine                    Hosted on Render / Docker
-Own .env with model provider key              NO provider keys allowed
-Executes real benchmarks                      Read-only UI; all writes denied (403)
-Full prompt & tool traces                     Allowlisted summary report (results.json)
+Private Execution Workbench                   Public Results Showcase
+───────────────────────────                   ───────────────────────
+Runs on your local machine                    Hosted on GitHub Pages (100% free, no credit card)
+Own .env with model provider key              NO provider keys, NO backend server needed
+Executes real benchmarks                      Read-only UI; static demo mode
+Full prompt & tool traces                     Sanitized benchmark runs & reference data
 ```
 
-### 1. Export a Public Report
+### 1. Free, Cardless Public Demo (GitHub Pages — Recommended)
+A dedicated GitHub Actions workflow is provided in `.github/workflows/deploy-pages.yml` that builds and deploys the read-only static showcase to GitHub Pages completely free without requiring credit card or payment details:
+1. In your GitHub repository, navigate to **Settings** → **Pages**.
+2. Under **Build and deployment** → **Source**, select **GitHub Actions**.
+3. Push to `main` (or run the workflow manually via **Actions** → **Deploy Static Demo to GitHub Pages** → **Run workflow**).
+4. Your static showcase will be live at `https://<username>.github.io/<repo-name>/`.
+
+### 2. Export a Public Report for Local / Docker Gallery
 After completing an experiment in your local workbench, export the sanitized summary:
 ```bash
 python3 scripts/publish_results.py --url http://localhost:8000 --latest --confirm-public
 ```
 This writes `public-data/results.json`, including agent metadata, metrics, and field checks while withholding raw prompts, execution traces, and secrets.
 
-### 2. Preview Read-Only Gallery Locally
-```bash
-ARENA_READ_ONLY=1 OPENAI_API_KEY='' \
-  .venv/bin/python -m uvicorn arena_server.main:app --port 8001
-```
-Open **http://localhost:8001**. The public-mode banner will be displayed, and all write endpoints are disabled.
-
-### 3. Deploy to Hosting
-- **Docker:** `Dockerfile` and `compose.yaml` are included for containerized hosting.
-- **Render:** A ready-to-use blueprint is provided in `render.yaml` for public read-only deployment.
+### 3. Alternative Hosting Options
+- **Docker:** `Dockerfile` and `compose.yaml` are included for self-hosted containerized deployment.
+- **Render:** An optional blueprint is provided in `render.yaml` (note: Render web services may require billing verification).
 - **Release Packaging:** Build a portable release ZIP using `python3 scripts/package.py`.
 - For step-by-step instructions, see [docs/PUBLISH.md](docs/PUBLISH.md).
 
